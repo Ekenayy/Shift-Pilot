@@ -1,0 +1,10 @@
+{
+  "name": "shift-pilot",
+  "private": true,
+  "scripts": {
+    "dev:mobile": "pnpm --filter mobile start"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.0"
+  }
+}
