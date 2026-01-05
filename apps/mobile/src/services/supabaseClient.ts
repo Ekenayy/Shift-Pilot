@@ -1,14 +1,25 @@
+import "react-native-url-polyfill/auto";
 import { createClient } from "@supabase/supabase-js";
-import Constants from "expo-constants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import type { Database } from "../types/database";
 
-const extra = Constants.expoConfig?.extra;
+const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL ?? "";
+const SUPABASE_PUBLISHABLE_KEY =
+  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "";
 
-const SUPABASE_URL = extra?.supabaseUrl ?? "";
-const SUPABASE_ANON_KEY = extra?.supabaseAnonKey ?? "";
-
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.warn("Supabase credentials not configured. Check your .env file.");
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  console.error("Supabase credentials not configured. Check your .env file.");
 }
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY);
+export const supabase = createClient<Database>(
+  SUPABASE_URL,
+  SUPABASE_PUBLISHABLE_KEY,
+  {
+    auth: {
+      storage: AsyncStorage,
+      autoRefreshToken: true,
+      persistSession: true,
+      detectSessionInUrl: false,
+    },
+  }
+);

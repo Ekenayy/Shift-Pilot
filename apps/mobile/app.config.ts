@@ -2,15 +2,18 @@ import { ExpoConfig, ConfigContext } from "expo/config";
 
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
-  name: "Mileage Tracker",
-  slug: "mileage-tracker",
+  name: "Shift Pilot",
+  slug: "shift-pilot",
   version: "1.0.0",
   orientation: "portrait",
   userInterfaceStyle: "automatic",
+  newArchEnabled: false,
+  plugins: ["expo-web-browser"],
   assetBundlePatterns: ["**/*"],
   ios: {
     supportsTablet: true,
     bundleIdentifier: "com.shiftpilot.mileage",
+    usesAppleSignIn: true,
   },
   android: {
     adaptiveIcon: {
@@ -19,7 +22,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     package: "com.shiftpilot.mileage",
   },
   extra: {
-    supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
-    supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+    googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
+    googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
   },
 });
