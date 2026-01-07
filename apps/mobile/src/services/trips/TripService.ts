@@ -18,6 +18,20 @@ export interface CreateTripParams {
   notes?: string;
 }
 
+export interface CreateManualTripParams {
+  startedAt: Date;
+  endedAt?: Date;
+  originLat: number;
+  originLng: number;
+  destLat: number;
+  destLng: number;
+  originAddress: string;
+  destAddress: string;
+  distanceMiles: number;
+  purpose?: TripPurpose;
+  notes?: string;
+}
+
 export interface TripFilters {
   classificationStatus?: ClassificationStatus | "all";
   purpose?: TripPurpose | "all";
@@ -171,6 +185,78 @@ class TripService {
     }
 
     console.log(`[TripService] Created trip: ${(data as Trip).id}`);
+    return data as Trip;
+  }
+
+  // Create a manual trip (user-entered start/end points)
+  async createManualTrip(params: CreateManualTripParams): Promise<Trip> {
+    const {
+      startedAt,
+      endedAt,
+      originLat,
+      originLng,
+      destLat,
+      destLng,
+      originAddress,
+      destAddress,
+      distanceMiles,
+      purpose = "unknown",
+      notes,
+    } = params;
+
+    // Get current user
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) throw new Error("Not authenticated");
+
+    // Calculate deduction
+    const deduction = await deductionService.calculateDeduction(
+      distanceMiles,
+      purpose
+    );
+
+    // Calculate end time if not provided (estimate based on 30 mph average)
+    const tripEndedAt =
+      endedAt || new Date(startedAt.getTime() + (distanceMiles / 30) * 60 * 60 * 1000);
+    const durationSeconds = Math.floor(
+      (tripEndedAt.getTime() - startedAt.getTime()) / 1000
+    );
+
+    const tripData: TripInsert = {
+      user_id: user.id,
+      started_at: startedAt.toISOString(),
+      ended_at: tripEndedAt.toISOString(),
+      duration_seconds: durationSeconds,
+      distance_miles: Number(distanceMiles.toFixed(2)),
+      distance_km: Number((distanceMiles * 1.60934).toFixed(2)),
+      purpose,
+      deduction_rate: deduction.rate,
+      deduction_value: deduction.value,
+      origin_lat: originLat,
+      origin_lng: originLng,
+      dest_lat: destLat,
+      dest_lng: destLng,
+      origin_address: originAddress,
+      dest_address: destAddress,
+      source: "manual",
+      notes,
+      classification_status:
+        purpose === "unknown" ? "unclassified" : "manually_classified",
+    };
+
+    const { data, error } = await supabase
+      .from("trips")
+      .insert(tripData as any)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[TripService] Error creating manual trip:", error);
+      throw error;
+    }
+
+    console.log(`[TripService] Created manual trip: ${(data as Trip).id}`);
     return data as Trip;
   }
 

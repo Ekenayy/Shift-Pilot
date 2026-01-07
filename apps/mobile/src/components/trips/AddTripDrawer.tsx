@@ -25,6 +25,7 @@ import type { TripPurpose, DeductionRate } from "../../types/database";
 import { LocationSearchModal, type LocationData } from "./LocationSearchModal";
 import { TripMapPreview } from "./TripMapPreview";
 import { deductionService } from "../../services/trips";
+import { useTrips } from "../../context/TripsContext";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const DRAWER_HEIGHT = SCREEN_HEIGHT * 0.9;
@@ -47,6 +48,7 @@ const PURPOSE_ICONS: Record<TripPurpose, string> = {
 };
 
 export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
+  const { addTrip } = useTrips();
   const translateY = useRef(new Animated.Value(DRAWER_HEIGHT)).current;
   const [shouldRender, setShouldRender] = useState(false);
 
@@ -75,6 +77,10 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
     useState(false);
   const [deductionRates, setDeductionRates] = useState<DeductionRate[]>([]);
   const [ratesLoading, setRatesLoading] = useState(false);
+
+  // Saving state
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   // Fetch deduction rates when drawer opens
   useEffect(() => {
@@ -142,6 +148,7 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
       setClassification(null);
       setVehicle("");
       setNotes("");
+      setShowSuccessModal(false);
     }
   }, [visible]);
 
@@ -156,6 +163,74 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
     } else {
       setEndLocationData(location);
     }
+  };
+
+  // Handle adding the trip
+  const handleAddTrip = async (skipClassification = false) => {
+    if (!startLocationData || !endLocationData) return;
+
+    // If not classified and not skipping, ask user
+    if (!classification && !skipClassification) {
+      Alert.alert(
+        "Classify this trip?",
+        "Adding a classification helps track your deductions. Would you like to classify it now?",
+        [
+          {
+            text: "Add without classifying",
+            style: "default",
+            onPress: () => handleAddTrip(true),
+          },
+          {
+            text: "Classify first",
+            style: "cancel",
+            onPress: () => setClassificationPickerVisible(true),
+          },
+        ]
+      );
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await addTrip({
+        startedAt: tripDate,
+        originLat: startLocationData.latitude,
+        originLng: startLocationData.longitude,
+        destLat: endLocationData.latitude,
+        destLng: endLocationData.longitude,
+        originAddress: startLocationData.address,
+        destAddress: endLocationData.address,
+        distanceMiles: parseFloat(distance),
+        purpose: classification || "unknown",
+        notes: notes || undefined,
+      });
+
+      // Show success modal
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error("Failed to add trip:", error);
+      Alert.alert("Error", "Failed to add trip. Please try again.", [
+        { text: "OK" },
+      ]);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleAddAnotherTrip = () => {
+    // Reset form but keep drawer open
+    setTripDate(new Date());
+    setStartLocationData(null);
+    setEndLocationData(null);
+    setClassification(null);
+    setVehicle("");
+    setNotes("");
+    setShowSuccessModal(false);
+  };
+
+  const handleGoToTrips = () => {
+    setShowSuccessModal(false);
+    closeDrawer();
   };
 
   // Pan responder for drag-to-dismiss
@@ -532,6 +607,57 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
           </SafeAreaView>
         </Modal>
 
+        {/* Success Modal */}
+        <Modal
+          visible={showSuccessModal}
+          transparent
+          animationType="fade"
+          onRequestClose={handleGoToTrips}
+        >
+          <View style={styles.successModalOverlay}>
+            <View style={styles.successModalContent}>
+              <Pressable
+                style={styles.successModalCloseButton}
+                onPress={handleGoToTrips}
+              >
+                <Text style={styles.successModalCloseButtonText}>✕</Text>
+              </Pressable>
+
+              <Text style={styles.successModalTitle}>Trip Added!</Text>
+
+              <View style={styles.successIconContainer}>
+                <View style={styles.successIconOuter}>
+                  <View style={styles.successIconInner}>
+                    <Text style={styles.successIconCheck}>✓</Text>
+                  </View>
+                </View>
+                <Text style={styles.successSparkle1}>✦</Text>
+                <Text style={styles.successSparkle2}>✦</Text>
+                <Text style={styles.successSparkle3}>✦</Text>
+                <Text style={styles.successSparkle4}>✦</Text>
+              </View>
+
+              <Pressable
+                style={styles.successPrimaryButton}
+                onPress={handleAddAnotherTrip}
+              >
+                <Text style={styles.successPrimaryButtonText}>
+                  Add another trip
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={styles.successSecondaryButton}
+                onPress={handleGoToTrips}
+              >
+                <Text style={styles.successSecondaryButtonText}>
+                  Go back to Trips
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+
         {/* Sticky footer */}
         <View style={styles.footer}>
           <View style={styles.footerSummary}>
@@ -546,18 +672,24 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
           <Pressable
             style={[
               styles.addButton,
-              parseFloat(distance) === 0 && styles.addButtonDisabled,
+              (parseFloat(distance) === 0 || isSaving) &&
+                styles.addButtonDisabled,
             ]}
-            disabled={parseFloat(distance) === 0}
+            disabled={parseFloat(distance) === 0 || isSaving}
+            onPress={() => handleAddTrip()}
           >
-            <Text
-              style={[
-                styles.addButtonText,
-                parseFloat(distance) === 0 && styles.addButtonTextDisabled,
-              ]}
-            >
-              Add drive
-            </Text>
+            {isSaving ? (
+              <ActivityIndicator size="small" color={colors.white} />
+            ) : (
+              <Text
+                style={[
+                  styles.addButtonText,
+                  parseFloat(distance) === 0 && styles.addButtonTextDisabled,
+                ]}
+              >
+                Add drive
+              </Text>
+            )}
           </Pressable>
         </View>
       </Animated.View>
@@ -905,6 +1037,129 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.text.secondary,
     marginTop: 2,
+  },
+  // Success modal styles
+  successModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  successModalContent: {
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    maxWidth: 340,
+    alignItems: "center",
+  },
+  successModalCloseButton: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  successModalCloseButtonText: {
+    fontSize: 20,
+    color: colors.text.primary,
+  },
+  successModalTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: colors.text.primary,
+    marginTop: 8,
+    marginBottom: 32,
+  },
+  successIconContainer: {
+    position: "relative",
+    width: 120,
+    height: 120,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 40,
+  },
+  successIconOuter: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: colors.accent,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  successIconInner: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.success,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  successIconCheck: {
+    fontSize: 40,
+    color: colors.white,
+    fontWeight: "bold",
+  },
+  successSparkle1: {
+    position: "absolute",
+    top: 10,
+    left: 20,
+    fontSize: 16,
+    color: colors.warning,
+  },
+  successSparkle2: {
+    position: "absolute",
+    top: 25,
+    right: 15,
+    fontSize: 12,
+    color: colors.warning,
+  },
+  successSparkle3: {
+    position: "absolute",
+    bottom: 20,
+    left: 15,
+    fontSize: 10,
+    color: colors.warning,
+  },
+  successSparkle4: {
+    position: "absolute",
+    bottom: 10,
+    right: 25,
+    fontSize: 18,
+    color: colors.warning,
+  },
+  successPrimaryButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    width: "100%",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  successPrimaryButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.white,
+  },
+  successSecondaryButton: {
+    backgroundColor: colors.white,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    width: "100%",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  successSecondaryButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.text.primary,
   },
 });
 

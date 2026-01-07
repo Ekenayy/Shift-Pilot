@@ -6,7 +6,12 @@ import {
   useCallback,
   type ReactNode,
 } from "react";
-import { tripService, deductionService, type TripFilters } from "../services/trips";
+import {
+  tripService,
+  deductionService,
+  type TripFilters,
+  type CreateManualTripParams,
+} from "../services/trips";
 import type {
   Trip,
   DeductionRate,
@@ -37,6 +42,7 @@ interface TripsContextType {
 
   // CRUD operations
   refreshTrips: () => Promise<void>;
+  addTrip: (params: CreateManualTripParams) => Promise<Trip>;
   classifyTrip: (tripId: string, purpose: TripPurpose) => Promise<void>;
   deleteTrip: (tripId: string) => Promise<void>;
   toggleFavorite: (tripId: string) => Promise<void>;
@@ -137,6 +143,22 @@ export function TripsProvider({ children }: { children: ReactNode }) {
     setIsRefreshing(false);
   }, [fetchTrips]);
 
+  // Add a new manual trip
+  const addTrip = useCallback(
+    async (params: CreateManualTripParams): Promise<Trip> => {
+      try {
+        const newTrip = await tripService.createManualTrip(params);
+        // Add to beginning of list (most recent first)
+        setTrips((prev) => [newTrip, ...prev]);
+        return newTrip;
+      } catch (err) {
+        console.error("[TripsContext] Error adding trip:", err);
+        throw err;
+      }
+    },
+    []
+  );
+
   // Classify trip
   const classifyTrip = useCallback(
     async (tripId: string, purpose: TripPurpose) => {
@@ -201,6 +223,7 @@ export function TripsProvider({ children }: { children: ReactNode }) {
     viewMode,
     setViewMode,
     refreshTrips,
+    addTrip,
     classifyTrip,
     deleteTrip,
     toggleFavorite,
