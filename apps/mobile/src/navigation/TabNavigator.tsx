@@ -349,10 +349,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 8,
     elevation: 10,
-    zIndex: 10,
+    zIndex: 1000,
   },
   addButtonOpen: {
-    backgroundColor: colors.accent,
+    backgroundColor: colors.error,
   },
   addButtonText: {
     color: colors.white,
