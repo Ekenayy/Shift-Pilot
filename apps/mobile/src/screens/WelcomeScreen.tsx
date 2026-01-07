@@ -53,7 +53,7 @@ export default function WelcomeScreen({ navigation }: Props) {
         </Text>
 
         <View style={styles.buttons}>
-          {Platform.OS === "ios" && (
+          {/* {Platform.OS === "ios" && (
             <Pressable
               style={[styles.button, styles.appleButton]}
               onPress={handleAppleSignIn}
@@ -62,7 +62,7 @@ export default function WelcomeScreen({ navigation }: Props) {
               <Text style={styles.appleIcon}></Text>
               <Text style={styles.appleButtonText}>Continue with Apple</Text>
             </Pressable>
-          )}
+          )} */}
 
           <Pressable
             style={[styles.button, styles.googleButton]}
