@@ -13,6 +13,7 @@ import HomeScreen from "../screens/HomeScreen";
 import TripsScreen from "../screens/TripsScreen";
 import TransactionsScreen from "../screens/TransactionsScreen";
 import TaxesScreen from "../screens/TaxesScreen";
+import { AddTripDrawer } from "../components/trips";
 
 export type TabParamList = {
   Home: undefined;
@@ -81,10 +82,12 @@ function AnimatedOptionCard({
   option,
   index,
   visible,
+  onPress,
 }: {
   option: (typeof ADD_OPTIONS)[number];
   index: number;
   visible: boolean;
+  onPress: () => void;
 }) {
   const translateY = useRef(new Animated.Value(100)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -124,12 +127,7 @@ function AnimatedOptionCard({
 
   return (
     <Animated.View style={{ opacity, transform: [{ translateY }] }}>
-      <Pressable
-        style={styles.modalOption}
-        onPress={() => {
-          console.log(`${option.label} pressed`);
-        }}
-      >
+      <Pressable style={styles.modalOption} onPress={onPress}>
         <Text style={styles.modalOptionIcon}>{option.icon}</Text>
         <Text style={styles.modalOptionLabel}>{option.label}</Text>
       </Pressable>
@@ -141,9 +139,11 @@ function AnimatedOptionCard({
 function AddModal({
   visible,
   onClose,
+  onOptionPress,
 }: {
   visible: boolean;
   onClose: () => void;
+  onOptionPress: (optionId: string) => void;
 }) {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const [shouldRender, setShouldRender] = useState(false);
@@ -184,6 +184,7 @@ function AddModal({
             option={option}
             index={index}
             visible={visible}
+            onPress={() => onOptionPress(option.id)}
           />
         ))}
       </View>
@@ -214,6 +215,7 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
 
 export default function TabNavigator() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isAddTripDrawerOpen, setIsAddTripDrawerOpen] = useState(false);
 
   const toggleAddModal = () => {
     setIsAddModalOpen((prev) => !prev);
@@ -221,6 +223,22 @@ export default function TabNavigator() {
 
   const closeAddModal = () => {
     setIsAddModalOpen(false);
+  };
+
+  const handleOptionPress = (optionId: string) => {
+    closeAddModal();
+    if (optionId === "trip") {
+      // Small delay to let the modal close animation complete
+      setTimeout(() => {
+        setIsAddTripDrawerOpen(true);
+      }, 200);
+    } else {
+      console.log(`${optionId} pressed`);
+    }
+  };
+
+  const closeAddTripDrawer = () => {
+    setIsAddTripDrawerOpen(false);
   };
 
   return (
@@ -289,7 +307,15 @@ export default function TabNavigator() {
           }}
         />
       </Tab.Navigator>
-      <AddModal visible={isAddModalOpen} onClose={closeAddModal} />
+      <AddModal
+        visible={isAddModalOpen}
+        onClose={closeAddModal}
+        onOptionPress={handleOptionPress}
+      />
+      <AddTripDrawer
+        visible={isAddTripDrawerOpen}
+        onClose={closeAddTripDrawer}
+      />
     </>
   );
 }
