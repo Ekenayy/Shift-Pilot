@@ -1,5 +1,13 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { View, Text, StyleSheet, Pressable } from "react-native";
+import {
+  View,
+  Text,
+  StyleSheet,
+  Pressable,
+  Animated,
+  Dimensions,
+} from "react-native";
+import { useState, useRef, useEffect } from "react";
 import { colors } from "../theme/colors";
 import HomeScreen from "../screens/HomeScreen";
 import TripsScreen from "../screens/TripsScreen";
@@ -16,17 +24,170 @@ export type TabParamList = {
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+
 // Placeholder for Add screen - opens modal later
 function AddPlaceholder() {
   return <View />;
 }
 
-// Custom center button
-function AddButton({ onPress }: { onPress: () => void }) {
+// Custom center button with rotation animation
+function AddButton({
+  onPress,
+  isOpen,
+}: {
+  onPress: () => void;
+  isOpen: boolean;
+}) {
+  const rotateAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.timing(rotateAnim, {
+      toValue: isOpen ? 1 : 0,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+  }, [isOpen, rotateAnim]);
+
+  const rotation = rotateAnim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ["0deg", "45deg"],
+  });
+
   return (
-    <Pressable style={styles.addButton} onPress={onPress}>
-      <Text style={styles.addButtonText}>+</Text>
+    <Pressable
+      style={[styles.addButton, isOpen && styles.addButtonOpen]}
+      onPress={onPress}
+    >
+      <Animated.Text
+        style={[styles.addButtonText, { transform: [{ rotate: rotation }] }]}
+      >
+        +
+      </Animated.Text>
     </Pressable>
+  );
+}
+
+// Add modal action options
+const ADD_OPTIONS = [
+  { id: "trip", label: "Add trip", icon: "🚗" },
+  { id: "expense", label: "Add expense", icon: "💵" },
+  { id: "revenue", label: "Add revenue", icon: "🪙" },
+  { id: "tracking", label: "Start tracking", icon: "📍" },
+] as const;
+
+// Animated option card component
+function AnimatedOptionCard({
+  option,
+  index,
+  visible,
+}: {
+  option: (typeof ADD_OPTIONS)[number];
+  index: number;
+  visible: boolean;
+}) {
+  const translateY = useRef(new Animated.Value(100)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 1,
+          duration: 250,
+          delay: index * 50,
+          useNativeDriver: true,
+        }),
+        Animated.spring(translateY, {
+          toValue: 0,
+          friction: 8,
+          tension: 65,
+          delay: index * 50,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(opacity, {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateY, {
+          toValue: 100,
+          duration: 150,
+          useNativeDriver: true,
+        }),
+      ]).start();
+    }
+  }, [visible, opacity, translateY, index]);
+
+  return (
+    <Animated.View style={{ opacity, transform: [{ translateY }] }}>
+      <Pressable
+        style={styles.modalOption}
+        onPress={() => {
+          console.log(`${option.label} pressed`);
+        }}
+      >
+        <Text style={styles.modalOptionIcon}>{option.icon}</Text>
+        <Text style={styles.modalOptionLabel}>{option.label}</Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+// Add Modal Component - uses View overlay instead of Modal for z-index control
+function AddModal({
+  visible,
+  onClose,
+}: {
+  visible: boolean;
+  onClose: () => void;
+}) {
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const [shouldRender, setShouldRender] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setShouldRender(true);
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => {
+        setShouldRender(false);
+      });
+    }
+  }, [visible, fadeAnim]);
+
+  if (!shouldRender) return null;
+
+  return (
+    <View style={styles.modalOverlay} pointerEvents="box-none">
+      <Animated.View
+        style={[styles.scrim, { opacity: fadeAnim }]}
+        pointerEvents={visible ? "auto" : "none"}
+      >
+        <Pressable style={styles.scrimPressable} onPress={onClose} />
+      </Animated.View>
+      <View style={styles.modalContent} pointerEvents="box-none">
+        {ADD_OPTIONS.map((option, index) => (
+          <AnimatedOptionCard
+            key={option.id}
+            option={option}
+            index={index}
+            visible={visible}
+          />
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -52,67 +213,84 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
 }
 
 export default function TabNavigator() {
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
+  const toggleAddModal = () => {
+    setIsAddModalOpen((prev) => !prev);
+  };
+
+  const closeAddModal = () => {
+    setIsAddModalOpen(false);
+  };
+
   return (
-    <Tab.Navigator
-      screenOptions={{
-        headerShown: false,
-        tabBarStyle: styles.tabBar,
-        tabBarActiveTintColor: colors.tabBar.active,
-        tabBarInactiveTintColor: colors.tabBar.inactive,
-        tabBarLabelStyle: styles.tabLabel,
-      }}
-    >
-      <Tab.Screen
-        name="Home"
-        component={HomeScreen}
-        options={{
-          tabBarIcon: ({ focused }) => <TabIcon name="Home" focused={focused} />,
+    <>
+      <Tab.Navigator
+        screenOptions={{
+          headerShown: false,
+          tabBarStyle: styles.tabBar,
+          tabBarActiveTintColor: colors.tabBar.active,
+          tabBarInactiveTintColor: colors.tabBar.inactive,
+          tabBarLabelStyle: styles.tabLabel,
         }}
-      />
-      <Tab.Screen
-        name="Trips"
-        component={TripsScreen}
-        options={{
-          tabBarIcon: ({ focused }) => <TabIcon name="Trips" focused={focused} />,
-          tabBarBadge: 10,
-          tabBarBadgeStyle: styles.badge,
-        }}
-      />
-      <Tab.Screen
-        name="Add"
-        component={AddPlaceholder}
-        options={{
-          tabBarLabel: () => null,
-          tabBarIcon: () => null,
-          tabBarButton: (props) => (
-            <AddButton onPress={() => props.onPress?.(undefined as any)} />
-          ),
-        }}
-        listeners={({ navigation }) => ({
-          tabPress: (e) => {
-            e.preventDefault();
-            // TODO: Open add trip modal
-            console.log("Add trip pressed");
-          },
-        })}
-      />
-      <Tab.Screen
-        name="Transactions"
-        component={TransactionsScreen}
-        options={{
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name="Transactions" focused={focused} />
-          ),
-        }}
-      />
-      <Tab.Screen
-        name="Taxes"
-        component={TaxesScreen}
-        options={{
-          tabBarIcon: ({ focused }) => <TabIcon name="Taxes" focused={focused} />,
-        }}
-      />
-    </Tab.Navigator>
+      >
+        <Tab.Screen
+          name="Home"
+          component={HomeScreen}
+          options={{
+            tabBarIcon: ({ focused }) => (
+              <TabIcon name="Home" focused={focused} />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Trips"
+          component={TripsScreen}
+          options={{
+            tabBarIcon: ({ focused }) => (
+              <TabIcon name="Trips" focused={focused} />
+            ),
+            tabBarBadge: 10,
+            tabBarBadgeStyle: styles.badge,
+          }}
+        />
+        <Tab.Screen
+          name="Add"
+          component={AddPlaceholder}
+          options={{
+            tabBarLabel: () => null,
+            tabBarIcon: () => null,
+            tabBarButton: () => (
+              <AddButton onPress={toggleAddModal} isOpen={isAddModalOpen} />
+            ),
+          }}
+          listeners={() => ({
+            tabPress: (e) => {
+              e.preventDefault();
+            },
+          })}
+        />
+        <Tab.Screen
+          name="Transactions"
+          component={TransactionsScreen}
+          options={{
+            tabBarIcon: ({ focused }) => (
+              <TabIcon name="Transactions" focused={focused} />
+            ),
+          }}
+        />
+        <Tab.Screen
+          name="Taxes"
+          component={TaxesScreen}
+          options={{
+            tabBarIcon: ({ focused }) => (
+              <TabIcon name="Taxes" focused={focused} />
+            ),
+          }}
+        />
+      </Tab.Navigator>
+      <AddModal visible={isAddModalOpen} onClose={closeAddModal} />
+    </>
   );
 }
 
@@ -144,7 +322,11 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 10,
+    zIndex: 10,
+  },
+  addButtonOpen: {
+    backgroundColor: colors.accent,
   },
   addButtonText: {
     color: colors.white,
@@ -157,5 +339,46 @@ const styles = StyleSheet.create({
     fontSize: 10,
     minWidth: 18,
     height: 18,
+  },
+  // Modal styles
+  modalOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: "flex-end",
+    zIndex: 1,
+  },
+  scrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.4)",
+  },
+  scrimPressable: {
+    flex: 1,
+  },
+  modalContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 180,
+    gap: 12,
+  },
+  modalOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.white,
+    paddingVertical: 18,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    gap: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  modalOptionIcon: {
+    fontSize: 24,
+  },
+  modalOptionLabel: {
+    fontSize: 18,
+    fontWeight: "500",
+    color: colors.text.primary,
   },
 });
