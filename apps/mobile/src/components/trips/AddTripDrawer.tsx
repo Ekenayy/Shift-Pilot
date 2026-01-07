@@ -9,14 +9,18 @@ import {
   TextInput,
   ScrollView,
   Platform,
+  Alert,
 } from "react-native";
 import { useState, useRef, useEffect, useMemo } from "react";
 import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import { format } from "date-fns";
+import { getDistance } from "geolib";
 import { colors } from "../../theme/colors";
 import type { TripPurpose } from "../../types/database";
+import { LocationSearchModal, type LocationData } from "./LocationSearchModal";
+import { TripMapPreview } from "./TripMapPreview";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const DRAWER_HEIGHT = SCREEN_HEIGHT * 0.9;
@@ -41,14 +45,42 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
   // Form state
   const [tripDate, setTripDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [startLocation, setStartLocation] = useState("");
-  const [endLocation, setEndLocation] = useState("");
+  const [startLocationData, setStartLocationData] =
+    useState<LocationData | null>(null);
+  const [endLocationData, setEndLocationData] = useState<LocationData | null>(
+    null
+  );
   const [classification, setClassification] = useState<TripPurpose | null>(
     null
   );
   const [vehicle, setVehicle] = useState("");
   const [notes, setNotes] = useState("");
-  const [distance, setDistance] = useState("0");
+
+  // Location search modal state
+  const [locationSearchVisible, setLocationSearchVisible] = useState(false);
+  const [locationSearchType, setLocationSearchType] = useState<"start" | "end">(
+    "start"
+  );
+
+  // Calculate distance using geolib when both locations are set
+  const distance = useMemo(() => {
+    if (startLocationData && endLocationData) {
+      const distanceMeters = getDistance(
+        {
+          latitude: startLocationData.latitude,
+          longitude: startLocationData.longitude,
+        },
+        {
+          latitude: endLocationData.latitude,
+          longitude: endLocationData.longitude,
+        }
+      );
+      // Convert meters to miles
+      const distanceMiles = distanceMeters / 1609.34;
+      return distanceMiles.toFixed(1);
+    }
+    return "0";
+  }, [startLocationData, endLocationData]);
 
   // Calculate deduction value (simplified - using standard IRS rate)
   const deductionValue = useMemo(() => {
@@ -58,18 +90,33 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
     return (miles * rate).toFixed(2);
   }, [distance, classification]);
 
+  // Check if both locations are set for showing map
+  const showMap = startLocationData && endLocationData;
+
   // Reset form when drawer opens
   useEffect(() => {
     if (visible) {
       setTripDate(new Date());
-      setStartLocation("");
-      setEndLocation("");
+      setStartLocationData(null);
+      setEndLocationData(null);
       setClassification(null);
       setVehicle("");
       setNotes("");
-      setDistance("0");
     }
   }, [visible]);
+
+  const openLocationSearch = (type: "start" | "end") => {
+    setLocationSearchType(type);
+    setLocationSearchVisible(true);
+  };
+
+  const handleLocationSelect = (location: LocationData) => {
+    if (locationSearchType === "start") {
+      setStartLocationData(location);
+    } else {
+      setEndLocationData(location);
+    }
+  };
 
   // Pan responder for drag-to-dismiss
   const panResponder = useMemo(
@@ -111,6 +158,36 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
       setShouldRender(false);
       onClose();
     });
+  };
+
+  // Check if user has made any changes
+  const hasChanges =
+    startLocationData !== null ||
+    endLocationData !== null ||
+    classification !== null ||
+    vehicle !== "" ||
+    notes !== "";
+
+  const handleClosePress = () => {
+    if (hasChanges) {
+      Alert.alert(
+        "Discard changes?",
+        "You have unsaved changes. Are you sure you want to discard them?",
+        [
+          {
+            text: "Keep editing",
+            style: "cancel",
+          },
+          {
+            text: "Discard",
+            style: "destructive",
+            onPress: closeDrawer,
+          },
+        ]
+      );
+    } else {
+      closeDrawer();
+    }
   };
 
   useEffect(() => {
@@ -176,7 +253,7 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
         </View>
 
         {/* Close button */}
-        <Pressable style={styles.closeButton} onPress={closeDrawer}>
+        <Pressable style={styles.closeButton} onPress={handleClosePress}>
           <Text style={styles.closeButtonText}>✕</Text>
         </Pressable>
 
@@ -184,7 +261,24 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
           style={styles.content}
           showsVerticalScrollIndicator={false}
           bounces={false}
+          keyboardShouldPersistTaps="handled"
         >
+          {/* Map Preview - shows when both locations are selected */}
+          {showMap && (
+            <View style={styles.mapContainer}>
+              <TripMapPreview
+                originLat={startLocationData.latitude}
+                originLng={startLocationData.longitude}
+                destLat={endLocationData.latitude}
+                destLng={endLocationData.longitude}
+                height={200}
+              />
+              <Pressable style={styles.mapExpandButton}>
+                <Text style={styles.mapExpandButtonText}>↗</Text>
+              </Pressable>
+            </View>
+          )}
+
           {/* Title */}
           <Text style={styles.title}>Add a Drive</Text>
 
@@ -221,30 +315,49 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
 
           {/* Location inputs */}
           <View style={styles.locationContainer}>
-            <View style={styles.locationRow}>
+            <Pressable
+              style={styles.locationRow}
+              onPress={() => openLocationSearch("start")}
+            >
               <View style={[styles.locationDot, styles.locationDotStart]} />
-              <TextInput
-                style={styles.locationInput}
-                placeholder="Enter start location"
-                placeholderTextColor={colors.text.muted}
-                value={startLocation}
-                onChangeText={setStartLocation}
-                editable={false}
-              />
+              <Text
+                style={[
+                  styles.locationInput,
+                  !startLocationData && styles.locationPlaceholder,
+                ]}
+                numberOfLines={1}
+              >
+                {startLocationData?.address || "Enter start location"}
+              </Text>
               <Text style={styles.timeLabel}>{formattedTime}</Text>
-            </View>
+            </Pressable>
             <View style={styles.locationLine} />
-            <View style={styles.locationRow}>
+            <Pressable
+              style={styles.locationRow}
+              onPress={() => openLocationSearch("end")}
+            >
               <View style={[styles.locationDot, styles.locationDotEnd]} />
-              <TextInput
-                style={styles.locationInput}
-                placeholder="Enter end location"
-                placeholderTextColor={colors.text.muted}
-                value={endLocation}
-                onChangeText={setEndLocation}
-                editable={false}
-              />
-            </View>
+              <Text
+                style={[
+                  styles.locationInput,
+                  !endLocationData && styles.locationPlaceholder,
+                ]}
+                numberOfLines={1}
+              >
+                {endLocationData?.address || "Enter end location"}
+              </Text>
+              {endLocationData && (
+                <Text style={styles.timeLabel}>
+                  {format(
+                    new Date(
+                      tripDate.getTime() +
+                        (parseFloat(distance) / 30) * 60 * 60 * 1000
+                    ),
+                    "h:mm a"
+                  )}
+                </Text>
+              )}
+            </Pressable>
           </View>
 
           {/* Classification dropdown */}
@@ -289,18 +402,12 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
             />
           </View>
 
-          {/* Distance input */}
+          {/* Distance display (calculated automatically) */}
           <View style={styles.metricsRow}>
             <View style={styles.metricItem}>
               <Text style={styles.metricLabel}>Distance</Text>
               <View style={styles.metricInputRow}>
-                <TextInput
-                  style={styles.metricInput}
-                  value={distance}
-                  onChangeText={setDistance}
-                  keyboardType="numeric"
-                  editable={false}
-                />
+                <Text style={styles.metricValue}>{distance}</Text>
                 <Text style={styles.metricUnit}>mi</Text>
               </View>
             </View>
@@ -309,6 +416,19 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
           {/* Spacer for footer */}
           <View style={styles.footerSpacer} />
         </ScrollView>
+
+        {/* Location Search Modal */}
+        <LocationSearchModal
+          visible={locationSearchVisible}
+          onClose={() => setLocationSearchVisible(false)}
+          onSelect={handleLocationSelect}
+          type={locationSearchType}
+          initialValue={
+            locationSearchType === "start"
+              ? startLocationData?.address
+              : endLocationData?.address
+          }
+        />
 
         {/* Sticky footer */}
         <View style={styles.footer}>
@@ -394,6 +514,32 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   closeButtonText: {
+    fontSize: 16,
+    color: colors.text.primary,
+  },
+  mapContainer: {
+    marginHorizontal: -20,
+    marginTop: -40,
+    marginBottom: 16,
+    position: "relative",
+  },
+  mapExpandButton: {
+    position: "absolute",
+    bottom: 16,
+    right: 16,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.white,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  mapExpandButtonText: {
     fontSize: 16,
     color: colors.text.primary,
   },
@@ -489,6 +635,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text.primary,
   },
+  locationPlaceholder: {
+    color: colors.text.muted,
+  },
   timeLabel: {
     fontSize: 14,
     color: colors.text.muted,
@@ -531,7 +680,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     paddingHorizontal: 16,
   },
-  metricInput: {
+  metricValue: {
     flex: 1,
     fontSize: 16,
     color: colors.text.primary,
