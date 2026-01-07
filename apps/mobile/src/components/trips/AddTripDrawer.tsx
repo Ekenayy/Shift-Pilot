@@ -10,17 +10,21 @@ import {
   ScrollView,
   Platform,
   Alert,
+  Modal,
+  ActivityIndicator,
 } from "react-native";
-import { useState, useRef, useEffect, useMemo } from "react";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import DateTimePicker, {
   DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import { format } from "date-fns";
 import { getDistance } from "geolib";
 import { colors } from "../../theme/colors";
-import type { TripPurpose } from "../../types/database";
+import type { TripPurpose, DeductionRate } from "../../types/database";
 import { LocationSearchModal, type LocationData } from "./LocationSearchModal";
 import { TripMapPreview } from "./TripMapPreview";
+import { deductionService } from "../../services/trips";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const DRAWER_HEIGHT = SCREEN_HEIGHT * 0.9;
@@ -31,12 +35,16 @@ interface AddTripDrawerProps {
   onClose: () => void;
 }
 
-const CLASSIFICATION_OPTIONS: { value: TripPurpose; label: string }[] = [
-  { value: "work", label: "Business" },
-  { value: "personal", label: "Personal" },
-  { value: "charity", label: "Charity" },
-  { value: "medical", label: "Medical" },
-];
+// Icons for each purpose type
+const PURPOSE_ICONS: Record<TripPurpose, string> = {
+  work: "💼",
+  personal: "🏠",
+  charity: "❤️",
+  medical: "🏥",
+  military: "🎖️",
+  mixed: "🔀",
+  unknown: "❓",
+};
 
 export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
   const translateY = useRef(new Animated.Value(DRAWER_HEIGHT)).current;
@@ -62,6 +70,31 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
     "start"
   );
 
+  // Classification picker state
+  const [classificationPickerVisible, setClassificationPickerVisible] =
+    useState(false);
+  const [deductionRates, setDeductionRates] = useState<DeductionRate[]>([]);
+  const [ratesLoading, setRatesLoading] = useState(false);
+
+  // Fetch deduction rates when drawer opens
+  useEffect(() => {
+    if (visible) {
+      loadDeductionRates();
+    }
+  }, [visible]);
+
+  const loadDeductionRates = useCallback(async () => {
+    setRatesLoading(true);
+    try {
+      const rates = await deductionService.getDeductionRates();
+      setDeductionRates(rates);
+    } catch (error) {
+      console.error("Failed to load deduction rates:", error);
+    } finally {
+      setRatesLoading(false);
+    }
+  }, []);
+
   // Calculate distance using geolib when both locations are set
   const distance = useMemo(() => {
     if (startLocationData && endLocationData) {
@@ -82,13 +115,20 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
     return "0";
   }, [startLocationData, endLocationData]);
 
-  // Calculate deduction value (simplified - using standard IRS rate)
+  // Get the selected rate for the current classification
+  const selectedRate = useMemo(() => {
+    if (!classification) return null;
+    return deductionRates.find((r) => r.purpose === classification) || null;
+  }, [classification, deductionRates]);
+
+  // Calculate deduction value using actual rates from database
   const deductionValue = useMemo(() => {
     const miles = parseFloat(distance) || 0;
-    // Standard IRS rate for 2024: $0.67 per mile for business
-    const rate = classification === "work" ? 0.67 : 0;
-    return (miles * rate).toFixed(2);
-  }, [distance, classification]);
+    if (!classification || !selectedRate || miles === 0) {
+      return "0";
+    }
+    return (miles * selectedRate.rate_per_mile).toFixed(2);
+  }, [distance, classification, selectedRate]);
 
   // Check if both locations are set for showing map
   const showMap = startLocationData && endLocationData;
@@ -361,18 +401,21 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
           </View>
 
           {/* Classification dropdown */}
-          <Pressable style={styles.inputRow}>
-            <Text style={styles.inputIcon}>⊙</Text>
+          <Pressable
+            style={styles.inputRow}
+            onPress={() => setClassificationPickerVisible(true)}
+          >
+            <Text style={styles.inputIcon}>
+              {classification ? PURPOSE_ICONS[classification] : "⊙"}
+            </Text>
             <Text
               style={[
                 styles.inputText,
                 !classification && styles.inputPlaceholder,
               ]}
             >
-              {classification
-                ? CLASSIFICATION_OPTIONS.find((o) => o.value === classification)
-                    ?.label
-                : "Classify as"}
+              {selectedRate?.display_name || "Classify as"}
+              {selectedRate && selectedRate.rate_per_mile > 0 && " ($)"}
             </Text>
             <Text style={styles.chevron}>▼</Text>
           </Pressable>
@@ -429,6 +472,65 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
               : endLocationData?.address
           }
         />
+
+        {/* Classification Picker Modal */}
+        <Modal
+          visible={classificationPickerVisible}
+          animationType="slide"
+          presentationStyle="pageSheet"
+          onRequestClose={() => setClassificationPickerVisible(false)}
+        >
+          <SafeAreaView style={styles.classificationModal}>
+            <View style={styles.classificationHeader}>
+              <Text style={styles.classificationTitle}>Select a purpose</Text>
+              <Pressable
+                style={styles.classificationCloseButton}
+                onPress={() => setClassificationPickerVisible(false)}
+              >
+                <Text style={styles.classificationCloseButtonText}>✕</Text>
+              </Pressable>
+            </View>
+            <ScrollView style={styles.classificationList}>
+              {ratesLoading ? (
+                <ActivityIndicator
+                  size="large"
+                  color={colors.primary}
+                  style={styles.classificationLoading}
+                />
+              ) : (
+                deductionRates.map((rate) => (
+                  <Pressable
+                    key={rate.id}
+                    style={[
+                      styles.classificationOption,
+                      classification === rate.purpose &&
+                        styles.classificationOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setClassification(rate.purpose);
+                      setClassificationPickerVisible(false);
+                    }}
+                  >
+                    <Text style={styles.classificationOptionIcon}>
+                      {PURPOSE_ICONS[rate.purpose] || "📍"}
+                    </Text>
+                    <View style={styles.classificationOptionContent}>
+                      <Text style={styles.classificationOptionLabel}>
+                        {rate.display_name}
+                        {rate.rate_per_mile > 0 && " ($)"}
+                      </Text>
+                      {rate.description && (
+                        <Text style={styles.classificationOptionDescription}>
+                          {rate.description}
+                        </Text>
+                      )}
+                    </View>
+                  </Pressable>
+                ))
+              )}
+            </ScrollView>
+          </SafeAreaView>
+        </Modal>
 
         {/* Sticky footer */}
         <View style={styles.footer}>
@@ -735,6 +837,74 @@ const styles = StyleSheet.create({
   },
   addButtonTextDisabled: {
     color: colors.text.muted,
+  },
+  // Classification picker styles
+  classificationModal: {
+    flex: 1,
+    backgroundColor: colors.white,
+  },
+  classificationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  classificationTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: colors.text.primary,
+  },
+  classificationCloseButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.background,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  classificationCloseButtonText: {
+    fontSize: 16,
+    color: colors.text.primary,
+  },
+  classificationList: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+  },
+  classificationLoading: {
+    marginTop: 40,
+  },
+  classificationOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    gap: 16,
+  },
+  classificationOptionSelected: {
+    backgroundColor: colors.background,
+    marginHorizontal: -20,
+    paddingHorizontal: 20,
+  },
+  classificationOptionIcon: {
+    fontSize: 24,
+  },
+  classificationOptionContent: {
+    flex: 1,
+  },
+  classificationOptionLabel: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: colors.text.primary,
+  },
+  classificationOptionDescription: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    marginTop: 2,
   },
 });
 

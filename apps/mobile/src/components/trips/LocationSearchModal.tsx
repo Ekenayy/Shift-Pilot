@@ -4,9 +4,9 @@ import {
   StyleSheet,
   Pressable,
   Modal,
-  SafeAreaView,
   Keyboard,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import Constants from "expo-constants";
 import { colors } from "../../theme/colors";
