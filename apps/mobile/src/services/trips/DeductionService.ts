@@ -12,7 +12,7 @@ class DeductionService {
   private static instance: DeductionService;
   private cachedRates: DeductionRate[] | null = null;
   private cacheExpiry: number = 0;
-  private readonly CACHE_DURATION = 3600000; // 1 hour
+  private readonly CACHE_DURATION = 86400000; // 24 hours
 
   private constructor() {}
 
