@@ -6,8 +6,10 @@ import {
   Pressable,
   Animated,
   Dimensions,
+  Alert,
 } from "react-native";
 import { useState, useRef, useEffect } from "react";
+import { useNavigation } from "@react-navigation/native";
 import { colors } from "../theme/colors";
 import HomeScreen from "../screens/HomeScreen";
 import TripsScreen from "../screens/TripsScreen";
@@ -15,6 +17,7 @@ import TransactionsScreen from "../screens/TransactionsScreen";
 import TaxesScreen from "../screens/TaxesScreen";
 import { AddTripDrawer, EditTripDrawer } from "../components/trips";
 import { EditTripProvider, useEditTrip } from "../context/EditTripContext";
+import { useActiveTrip } from "../context/ActiveTripContext";
 
 export type TabParamList = {
   Home: undefined;
@@ -218,6 +221,8 @@ function TabNavigatorContent() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAddTripDrawerOpen, setIsAddTripDrawerOpen] = useState(false);
   const { isOpen: isEditTripDrawerOpen, tripToEdit, closeEditDrawer } = useEditTrip();
+  const { isTracking, startManualTrip } = useActiveTrip();
+  const navigation = useNavigation();
 
   const toggleAddModal = () => {
     setIsAddModalOpen((prev) => !prev);
@@ -227,12 +232,37 @@ function TabNavigatorContent() {
     setIsAddModalOpen(false);
   };
 
+  const handleStartTracking = async () => {
+    if (isTracking) {
+      Alert.alert(
+        "Trip in Progress",
+        "You already have an active trip. Stop it before starting a new one.",
+        [{ text: "OK" }]
+      );
+      return;
+    }
+
+    try {
+      await startManualTrip();
+      // Navigate to Home to show the ActiveTripCard
+      navigation.navigate("Home" as never);
+    } catch (error) {
+      console.error("Error starting trip:", error);
+      Alert.alert("Error", "Failed to start trip. Please try again.");
+    }
+  };
+
   const handleOptionPress = (optionId: string) => {
     closeAddModal();
     if (optionId === "trip") {
       // Small delay to let the modal close animation complete
       setTimeout(() => {
         setIsAddTripDrawerOpen(true);
+      }, 200);
+    } else if (optionId === "tracking") {
+      // Small delay to let the modal close animation complete
+      setTimeout(() => {
+        handleStartTracking();
       }, 200);
     } else {
       console.log(`${optionId} pressed`);

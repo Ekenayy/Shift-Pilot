@@ -457,15 +457,19 @@ export function EditTripDrawer({ visible, onClose, trip }: EditTripDrawerProps) 
             </View>
           )}
 
-          {/* Date and deduction header */}
+          {/* Date header - centered */}
           <Text style={styles.dateHeader}>{formattedDate}</Text>
+
+          {/* Stats row - miles left, deduction right */}
           <View style={styles.statsRow}>
-            <Text style={styles.deductionDisplay}>
-              $ {deductionValue}
-            </Text>
-            <Text style={styles.distanceDisplay}>
-              {distance} mi
-            </Text>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>{distance}</Text>
+              <Text style={styles.statLabel}>Miles</Text>
+            </View>
+            <View style={styles.statItem}>
+              <Text style={styles.statValue}>${deductionValue}</Text>
+              <Text style={styles.statLabel}>Deduction</Text>
+            </View>
           </View>
 
           {/* Location inputs */}
@@ -744,23 +748,28 @@ const styles = StyleSheet.create({
   dateHeader: {
     fontSize: 16,
     color: colors.text.secondary,
-    marginBottom: 8,
+    textAlign: "center",
+    marginBottom: 16,
   },
   statsRow: {
     flexDirection: "row",
-    alignItems: "baseline",
-    gap: 16,
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 24,
+    paddingHorizontal: 40,
   },
-  deductionDisplay: {
-    fontSize: 28,
+  statItem: {
+    alignItems: "center",
+  },
+  statValue: {
+    fontSize: 32,
     fontWeight: "bold",
     color: colors.text.primary,
   },
-  distanceDisplay: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: colors.text.primary,
+  statLabel: {
+    fontSize: 14,
+    color: colors.text.muted,
+    marginTop: 4,
   },
   inputRow: {
     flexDirection: "row",

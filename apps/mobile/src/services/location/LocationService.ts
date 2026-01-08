@@ -12,8 +12,7 @@ import {
   requestBackgroundPermission,
   hasForegroundAccess,
 } from "./LocationPermissions";
-
-export const BACKGROUND_LOCATION_TASK = "shift-pilot-background-location";
+import { BACKGROUND_LOCATION_TASK } from "./BackgroundLocationHandler";
 
 type LocationCallback = (location: LocationUpdate) => void;
 
