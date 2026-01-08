@@ -75,11 +75,23 @@ Based on core assumptions that must validate:
 
 ---
 
+## Type Hygiene
+- Try to properly type values.  
+- Avoid the use of "any" types. This should be a last resort. If you dojn't know the type of value upfront, use "unknown" instead. 
+
+---
+
 ## Commit Hygiene
 
 - Keep commits focused and atomic
 - Prefix with area when useful: `mobile:`, `supabase:`, `shared:`
 - No generated footers or co-author tags
+
+---
+
+## Cross platform building
+
+- Keep in mind that this will be released on both android and IOS. If there is a package or proerty not supported by one of the platforms, we need to account for that and drop in an alternative
 
 ---
 
