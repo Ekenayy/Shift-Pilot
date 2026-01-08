@@ -25,7 +25,7 @@ const SAVE_THROTTLE_MS = 30000;
 
 // Minimum trip thresholds for validity
 const MIN_TRIP_DISTANCE_METERS = 160; // ~0.1 miles
-const MIN_TRIP_DURATION_MS = 60000; // 60 seconds
+const MIN_TRIP_DURATION_MS = 10000; // 10 seconds
 
 export interface ActiveTripData {
   startTime: number;
@@ -347,7 +347,7 @@ export function ActiveTripProvider({ children }: { children: ReactNode }) {
       // Show alert explaining why trip was discarded
       Alert.alert(
         "Trip Not Saved",
-        `Your trip was too short to save. Trips must be at least 0.1 miles and 60 seconds long.\n\nYour trip: ${distanceMiles} miles, ${durationSeconds} seconds.`,
+        `Your trip was too short to save. Trips must be at least 0.1 miles and 10 seconds long.\n\nYour trip: ${distanceMiles} miles, ${durationSeconds} seconds.`,
         [{ text: "OK" }]
       );
 
@@ -385,7 +385,7 @@ export function ActiveTripProvider({ children }: { children: ReactNode }) {
 
     // Set up trip detection callbacks
     const detectionCallback = (
-      event: "trip_started" | "trip_stopped",
+      event: "trip_started" | "trip_stopped" | "trip_updated",
       data: { locations: LocationUpdate[]; distance: number; duration: number }
     ) => {
       handleTripDetectionEvent(event, data);
@@ -394,7 +394,7 @@ export function ActiveTripProvider({ children }: { children: ReactNode }) {
     tripDetectionService.addCallback(detectionCallback);
 
     return true;
-  }, []);
+  }, [handleTripDetectionEvent]);
 
   // Disable auto-detect mode
   const disableAutoDetect = useCallback(async () => {
@@ -423,7 +423,7 @@ export function ActiveTripProvider({ children }: { children: ReactNode }) {
 
     // Set up trip detection callbacks
     const detectionCallback = (
-      event: "trip_started" | "trip_stopped",
+      event: "trip_started" | "trip_stopped" | "trip_updated",
       data: { locations: LocationUpdate[]; distance: number; duration: number }
     ) => {
       handleTripDetectionEvent(event, data);
@@ -435,7 +435,7 @@ export function ActiveTripProvider({ children }: { children: ReactNode }) {
   // Handle trip detection events (auto mode)
   const handleTripDetectionEvent = useCallback(
     (
-      event: "trip_started" | "trip_stopped",
+      event: "trip_started" | "trip_stopped" | "trip_updated",
       data: { locations: LocationUpdate[]; distance: number; duration: number }
     ) => {
       if (event === "trip_started") {
@@ -462,6 +462,18 @@ export function ActiveTripProvider({ children }: { children: ReactNode }) {
 
         // Send push notification that trip started
         notificationService.notifyTripStarted();
+      } else if (event === "trip_updated") {
+        // Update current trip with new location data (only for auto mode)
+        if (isTracking && trackingMode === "auto") {
+          setCurrentTrip((prev) => {
+            if (!prev || prev.mode !== "auto") return prev;
+            return {
+              ...prev,
+              locations: data.locations,
+              distanceMeters: data.distance,
+            };
+          });
+        }
       } else if (event === "trip_stopped") {
         console.log("[ActiveTrip] Auto-detected trip stopped", {
           duration: `${(data.duration / 1000).toFixed(0)}s`,

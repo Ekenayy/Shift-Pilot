@@ -3,7 +3,7 @@ import type { LocationUpdate } from "./types";
 // Detection thresholds
 const MOVEMENT_SPEED_THRESHOLD = 3; // m/s (~7 mph)
 const STATIONARY_SPEED_THRESHOLD = 1; // m/s (~2 mph)
-const MOVEMENT_CONFIRMATION_TIME = 60000; // 60 seconds to confirm moving
+const MOVEMENT_CONFIRMATION_TIME = 5000; // 5 seconds to confirm moving (reduced from 60s)
 const STATIONARY_TIMEOUT = 180000; // 3 minutes stationary to end trip
 const MIN_TRIP_DURATION = 60000; // 60 seconds minimum
 const MIN_TRIP_DISTANCE = 160; // meters (~0.1 miles)
@@ -23,8 +23,10 @@ interface DetectionStateData {
   totalDistance: number; // meters
 }
 
+export type TripDetectionEvent = "trip_started" | "trip_stopped" | "trip_updated";
+
 export type TripDetectionCallback = (
-  event: "trip_started" | "trip_stopped",
+  event: TripDetectionEvent,
   data: { locations: LocationUpdate[]; distance: number; duration: number }
 ) => void;
 
@@ -63,7 +65,7 @@ class TripDetectionService {
 
   // Notify all callbacks
   private notifyCallbacks(
-    event: "trip_started" | "trip_stopped",
+    event: TripDetectionEvent,
     data: { locations: LocationUpdate[]; distance: number; duration: number }
   ): void {
     this.callbacks.forEach((callback) => {
@@ -105,6 +107,16 @@ class TripDetectionService {
 
       case "MOVING":
         this.addLocation(location);
+
+        // Notify callbacks with updated trip data
+        const movingDuration = this.stateData.tripStartTime
+          ? now - this.stateData.tripStartTime
+          : 0;
+        this.notifyCallbacks("trip_updated", {
+          locations: [...this.stateData.locations],
+          distance: this.stateData.totalDistance,
+          duration: movingDuration,
+        });
 
         if (speed < STATIONARY_SPEED_THRESHOLD) {
           this.transitionTo("POSSIBLY_STOPPED", location);
