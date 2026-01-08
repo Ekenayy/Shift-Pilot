@@ -10,6 +10,7 @@ interface TripCardProps {
   onDelete: (tripId: string) => void;
   onToggleFavorite: (tripId: string) => void;
   onAddNotes?: (tripId: string) => void;
+  onEdit?: (trip: Trip) => void;
 }
 
 const purposeLabels: Record<TripPurpose, string> = {
@@ -38,6 +39,7 @@ export function TripCard({
   onDelete,
   onToggleFavorite,
   onAddNotes,
+  onEdit,
 }: TripCardProps) {
   const purpose = trip.purpose || "unknown";
   const isUnclassified = trip.classification_status === "unclassified";
@@ -45,8 +47,14 @@ export function TripCard({
   const startTime = format(new Date(trip.started_at), "h:mm a");
   const endTime = format(new Date(trip.ended_at), "h:mm a");
 
+  const handlePress = () => {
+    if (onEdit) {
+      onEdit(trip);
+    }
+  };
+
   return (
-    <View style={styles.container}>
+    <Pressable style={styles.container} onPress={handlePress}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.date}>{formattedDate.toUpperCase()}</Text>
@@ -142,7 +150,7 @@ export function TripCard({
           <Text style={styles.actionIcon}>🗑️</Text>
         </Pressable>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

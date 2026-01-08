@@ -13,7 +13,8 @@ import HomeScreen from "../screens/HomeScreen";
 import TripsScreen from "../screens/TripsScreen";
 import TransactionsScreen from "../screens/TransactionsScreen";
 import TaxesScreen from "../screens/TaxesScreen";
-import { AddTripDrawer } from "../components/trips";
+import { AddTripDrawer, EditTripDrawer } from "../components/trips";
+import { EditTripProvider, useEditTrip } from "../context/EditTripContext";
 
 export type TabParamList = {
   Home: undefined;
@@ -213,9 +214,10 @@ function TabIcon({ name, focused }: { name: string; focused: boolean }) {
   );
 }
 
-export default function TabNavigator() {
+function TabNavigatorContent() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isAddTripDrawerOpen, setIsAddTripDrawerOpen] = useState(false);
+  const { isOpen: isEditTripDrawerOpen, tripToEdit, closeEditDrawer } = useEditTrip();
 
   const toggleAddModal = () => {
     setIsAddModalOpen((prev) => !prev);
@@ -316,7 +318,20 @@ export default function TabNavigator() {
         visible={isAddTripDrawerOpen}
         onClose={closeAddTripDrawer}
       />
+      <EditTripDrawer
+        visible={isEditTripDrawerOpen}
+        onClose={closeEditDrawer}
+        trip={tripToEdit}
+      />
     </>
+  );
+}
+
+export default function TabNavigator() {
+  return (
+    <EditTripProvider>
+      <TabNavigatorContent />
+    </EditTripProvider>
   );
 }
 

@@ -386,6 +386,74 @@ class TripService {
     return data as Trip;
   }
 
+  // Update a manual trip (for editing)
+  async updateManualTrip(
+    tripId: string,
+    params: CreateManualTripParams
+  ): Promise<Trip> {
+    const {
+      startedAt,
+      endedAt,
+      originLat,
+      originLng,
+      destLat,
+      destLng,
+      originAddress,
+      destAddress,
+      distanceMiles,
+      purpose = "unknown",
+      notes,
+    } = params;
+
+    // Calculate deduction
+    const deduction = await deductionService.calculateDeduction(
+      distanceMiles,
+      purpose
+    );
+
+    // Calculate end time if not provided (estimate based on 30 mph average)
+    const tripEndedAt =
+      endedAt || new Date(startedAt.getTime() + (distanceMiles / 30) * 60 * 60 * 1000);
+    const durationSeconds = Math.floor(
+      (tripEndedAt.getTime() - startedAt.getTime()) / 1000
+    );
+
+    const updateData: TripUpdate = {
+      started_at: startedAt.toISOString(),
+      ended_at: tripEndedAt.toISOString(),
+      duration_seconds: durationSeconds,
+      distance_miles: Number(distanceMiles.toFixed(2)),
+      distance_km: Number((distanceMiles * 1.60934).toFixed(2)),
+      purpose,
+      deduction_rate: deduction.rate,
+      deduction_value: deduction.value,
+      origin_lat: originLat,
+      origin_lng: originLng,
+      dest_lat: destLat,
+      dest_lng: destLng,
+      origin_address: originAddress,
+      dest_address: destAddress,
+      notes,
+      classification_status:
+        purpose === "unknown" ? "unclassified" : "manually_classified",
+    };
+
+    const { data, error } = await supabase
+      .from("trips")
+      .update(updateData as any)
+      .eq("id", tripId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("[TripService] Error updating manual trip:", error);
+      throw error;
+    }
+
+    console.log(`[TripService] Updated manual trip: ${tripId}`);
+    return data as Trip;
+  }
+
   // Delete trip
   async deleteTrip(tripId: string): Promise<void> {
     const { error } = await supabase.from("trips").delete().eq("id", tripId);

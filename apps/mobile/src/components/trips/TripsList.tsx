@@ -21,6 +21,7 @@ interface TripsListProps {
   onClassify: (tripId: string) => void;
   onDelete: (tripId: string) => void;
   onToggleFavorite: (tripId: string) => void;
+  onEdit?: (trip: Trip) => void;
 }
 
 interface GroupedTrips {
@@ -125,6 +126,7 @@ export function TripsList({
   onClassify,
   onDelete,
   onToggleFavorite,
+  onEdit,
 }: TripsListProps) {
   if (isLoading && trips.length === 0) {
     return (
@@ -146,6 +148,7 @@ export function TripsList({
           onClassify={onClassify}
           onDelete={onDelete}
           onToggleFavorite={onToggleFavorite}
+          onEdit={onEdit}
         />
       ))}
     </View>

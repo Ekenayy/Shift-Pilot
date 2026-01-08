@@ -21,7 +21,7 @@ import DateTimePicker, {
 import { format } from "date-fns";
 import { getDistance } from "geolib";
 import { colors } from "../../theme/colors";
-import type { TripPurpose, DeductionRate } from "../../types/database";
+import type { Trip, TripPurpose, DeductionRate } from "../../types/database";
 import { LocationSearchModal, type LocationData } from "./LocationSearchModal";
 import { TripMapPreview } from "./TripMapPreview";
 import { deductionService } from "../../services/trips";
@@ -31,9 +31,10 @@ const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const DRAWER_HEIGHT = SCREEN_HEIGHT * 0.9;
 const DISMISS_THRESHOLD = 150;
 
-interface AddTripDrawerProps {
+interface EditTripDrawerProps {
   visible: boolean;
   onClose: () => void;
+  trip: Trip | null;
 }
 
 // Icons for each purpose type
@@ -47,8 +48,8 @@ const PURPOSE_ICONS: Record<TripPurpose, string> = {
   unknown: "❓",
 };
 
-export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
-  const { addTrip } = useTrips();
+export function EditTripDrawer({ visible, onClose, trip }: EditTripDrawerProps) {
+  const { editTrip, deleteTrip } = useTrips();
   const translateY = useRef(new Animated.Value(DRAWER_HEIGHT)).current;
   const [shouldRender, setShouldRender] = useState(false);
 
@@ -66,6 +67,15 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
   const [vehicle, setVehicle] = useState("");
   const [notes, setNotes] = useState("");
 
+  // Initial values for change detection
+  const [initialValues, setInitialValues] = useState<{
+    tripDate: Date;
+    startLocation: LocationData | null;
+    endLocation: LocationData | null;
+    classification: TripPurpose | null;
+    notes: string;
+  } | null>(null);
+
   // Location search modal state
   const [locationSearchVisible, setLocationSearchVisible] = useState(false);
   const [locationSearchType, setLocationSearchType] = useState<"start" | "end">(
@@ -78,9 +88,9 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
   const [deductionRates, setDeductionRates] = useState<DeductionRate[]>([]);
   const [ratesLoading, setRatesLoading] = useState(false);
 
-  // Saving state
+  // Saving/deleting state
   const [isSaving, setIsSaving] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Fetch deduction rates when drawer opens
   useEffect(() => {
@@ -100,6 +110,49 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
       setRatesLoading(false);
     }
   }, []);
+
+  // Initialize form with trip data when trip changes or drawer opens
+  useEffect(() => {
+    if (visible && trip) {
+      const date = new Date(trip.started_at);
+      const startLoc: LocationData | null =
+        trip.origin_lat && trip.origin_lng
+          ? {
+              latitude: trip.origin_lat,
+              longitude: trip.origin_lng,
+              address: trip.origin_address || "Unknown location",
+              placeId: "", // Not stored in DB, empty for existing trips
+            }
+          : null;
+      const endLoc: LocationData | null =
+        trip.dest_lat && trip.dest_lng
+          ? {
+              latitude: trip.dest_lat,
+              longitude: trip.dest_lng,
+              address: trip.dest_address || "Unknown location",
+              placeId: "", // Not stored in DB, empty for existing trips
+            }
+          : null;
+      const purpose = trip.purpose || null;
+      const tripNotes = trip.notes || "";
+
+      setTripDate(date);
+      setStartLocationData(startLoc);
+      setEndLocationData(endLoc);
+      setClassification(purpose);
+      setNotes(tripNotes);
+      setVehicle("");
+
+      // Store initial values for change detection
+      setInitialValues({
+        tripDate: date,
+        startLocation: startLoc,
+        endLocation: endLoc,
+        classification: purpose,
+        notes: tripNotes,
+      });
+    }
+  }, [visible, trip]);
 
   // Calculate distance using geolib when both locations are set
   const distance = useMemo(() => {
@@ -139,18 +192,43 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
   // Check if both locations are set for showing map
   const showMap = startLocationData && endLocationData;
 
-  // Reset form when drawer opens
-  useEffect(() => {
-    if (visible) {
-      setTripDate(new Date());
-      setStartLocationData(null);
-      setEndLocationData(null);
-      setClassification(null);
-      setVehicle("");
-      setNotes("");
-      setShowSuccessModal(false);
-    }
-  }, [visible]);
+  // Check if user has made any changes compared to initial values
+  const hasChanges = useMemo(() => {
+    if (!initialValues) return false;
+
+    const dateChanged =
+      tripDate.getTime() !== initialValues.tripDate.getTime();
+
+    const startChanged =
+      startLocationData?.latitude !== initialValues.startLocation?.latitude ||
+      startLocationData?.longitude !== initialValues.startLocation?.longitude ||
+      startLocationData?.address !== initialValues.startLocation?.address;
+
+    const endChanged =
+      endLocationData?.latitude !== initialValues.endLocation?.latitude ||
+      endLocationData?.longitude !== initialValues.endLocation?.longitude ||
+      endLocationData?.address !== initialValues.endLocation?.address;
+
+    const classificationChanged =
+      classification !== initialValues.classification;
+
+    const notesChanged = notes !== initialValues.notes;
+
+    return (
+      dateChanged ||
+      startChanged ||
+      endChanged ||
+      classificationChanged ||
+      notesChanged
+    );
+  }, [
+    tripDate,
+    startLocationData,
+    endLocationData,
+    classification,
+    notes,
+    initialValues,
+  ]);
 
   const openLocationSearch = (type: "start" | "end") => {
     setLocationSearchType(type);
@@ -165,34 +243,13 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
     }
   };
 
-  // Handle adding the trip
-  const handleAddTrip = async (skipClassification = false) => {
-    if (!startLocationData || !endLocationData) return;
-
-    // If not classified and not skipping, ask user
-    if (!classification && !skipClassification) {
-      Alert.alert(
-        "Classify this trip?",
-        "Adding a classification helps track your deductions. Would you like to classify it now?",
-        [
-          {
-            text: "Add without classifying",
-            style: "default",
-            onPress: () => handleAddTrip(true),
-          },
-          {
-            text: "Classify first",
-            style: "cancel",
-            onPress: () => setClassificationPickerVisible(true),
-          },
-        ]
-      );
-      return;
-    }
+  // Handle saving the trip
+  const handleSaveTrip = async () => {
+    if (!trip || !startLocationData || !endLocationData) return;
 
     setIsSaving(true);
     try {
-      await addTrip({
+      await editTrip(trip.id, {
         startedAt: tripDate,
         originLat: startLocationData.latitude,
         originLng: startLocationData.longitude,
@@ -205,11 +262,10 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
         notes: notes || undefined,
       });
 
-      // Show success modal
-      setShowSuccessModal(true);
+      closeDrawer();
     } catch (error) {
-      console.error("Failed to add trip:", error);
-      Alert.alert("Error", "Failed to add trip. Please try again.", [
+      console.error("Failed to save trip:", error);
+      Alert.alert("Error", "Failed to save trip. Please try again.", [
         { text: "OK" },
       ]);
     } finally {
@@ -217,20 +273,38 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
     }
   };
 
-  const handleAddAnotherTrip = () => {
-    // Reset form but keep drawer open
-    setTripDate(new Date());
-    setStartLocationData(null);
-    setEndLocationData(null);
-    setClassification(null);
-    setVehicle("");
-    setNotes("");
-    setShowSuccessModal(false);
-  };
+  // Handle deleting the trip
+  const handleDeleteTrip = () => {
+    if (!trip) return;
 
-  const handleGoToTrips = () => {
-    setShowSuccessModal(false);
-    closeDrawer();
+    Alert.alert(
+      "Delete trip?",
+      "This action cannot be undone. Are you sure you want to delete this trip?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setIsDeleting(true);
+            try {
+              await deleteTrip(trip.id);
+              closeDrawer();
+            } catch (error) {
+              console.error("Failed to delete trip:", error);
+              Alert.alert("Error", "Failed to delete trip. Please try again.", [
+                { text: "OK" },
+              ]);
+            } finally {
+              setIsDeleting(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   // Pan responder for drag-to-dismiss
@@ -274,14 +348,6 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
       onClose();
     });
   };
-
-  // Check if user has made any changes
-  const hasChanges =
-    startLocationData !== null ||
-    endLocationData !== null ||
-    classification !== null ||
-    vehicle !== "" ||
-    notes !== "";
 
   const handleClosePress = () => {
     if (hasChanges) {
@@ -337,7 +403,7 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
 
   if (!shouldRender) return null;
 
-  const formattedDate = format(tripDate, "EEE, dd MMM, h:mm a");
+  const formattedDate = format(tripDate, "EEEE, d MMM, yyyy");
   const formattedTime = format(tripDate, "h:mm a");
 
   return (
@@ -388,45 +454,19 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
                 destLng={endLocationData.longitude}
                 height={200}
               />
-              <Pressable style={styles.mapExpandButton}>
-                <Text style={styles.mapExpandButtonText}>↗</Text>
-              </Pressable>
             </View>
           )}
 
-          {/* Title */}
-          <Text style={styles.title}>Add a Drive</Text>
-
-          {/* Date picker field */}
-          <Pressable
-            style={styles.inputRow}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Text style={styles.inputIcon}>📅</Text>
-            <Text style={styles.inputText}>{formattedDate}</Text>
-            <Text style={styles.chevron}>▼</Text>
-          </Pressable>
-
-          {/* Date picker modal */}
-          {showDatePicker && (
-            <View style={styles.datePickerContainer}>
-              <DateTimePicker
-                value={tripDate}
-                mode="datetime"
-                display={Platform.OS === "ios" ? "spinner" : "default"}
-                onChange={handleDateChange}
-                maximumDate={new Date()}
-              />
-              {Platform.OS === "ios" && (
-                <Pressable
-                  style={styles.datePickerDone}
-                  onPress={handleCloseDatePicker}
-                >
-                  <Text style={styles.datePickerDoneText}>Done</Text>
-                </Pressable>
-              )}
-            </View>
-          )}
+          {/* Date and deduction header */}
+          <Text style={styles.dateHeader}>{formattedDate}</Text>
+          <View style={styles.statsRow}>
+            <Text style={styles.deductionDisplay}>
+              $ {deductionValue}
+            </Text>
+            <Text style={styles.distanceDisplay}>
+              {distance} mi
+            </Text>
+          </View>
 
           {/* Location inputs */}
           <View style={styles.locationContainer}>
@@ -481,7 +521,7 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
             onPress={() => setClassificationPickerVisible(true)}
           >
             <Text style={styles.inputIcon}>
-              {classification ? PURPOSE_ICONS[classification] : "⊙"}
+              {classification ? PURPOSE_ICONS[classification] : "💼"}
             </Text>
             <Text
               style={[
@@ -489,8 +529,7 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
                 !classification && styles.inputPlaceholder,
               ]}
             >
-              {selectedRate?.display_name || "Classify as"}
-              {selectedRate && selectedRate.rate_per_mile > 0 && " ($)"}
+              {selectedRate?.display_name || "Business"}
             </Text>
             <Text style={styles.chevron}>▼</Text>
           </Pressable>
@@ -516,20 +555,21 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
               onChangeText={setNotes}
               multiline
               numberOfLines={3}
-              editable={false}
             />
           </View>
 
-          {/* Distance display (calculated automatically) */}
-          <View style={styles.metricsRow}>
-            <View style={styles.metricItem}>
-              <Text style={styles.metricLabel}>Distance</Text>
-              <View style={styles.metricInputRow}>
-                <Text style={styles.metricValue}>{distance}</Text>
-                <Text style={styles.metricUnit}>mi</Text>
-              </View>
-            </View>
-          </View>
+          {/* Delete button */}
+          <Pressable
+            style={styles.deleteButton}
+            onPress={handleDeleteTrip}
+            disabled={isDeleting}
+          >
+            {isDeleting ? (
+              <ActivityIndicator size="small" color={colors.error} />
+            ) : (
+              <Text style={styles.deleteButtonText}>Delete trip</Text>
+            )}
+          </Pressable>
 
           {/* Spacer for footer */}
           <View style={styles.footerSpacer} />
@@ -607,87 +647,26 @@ export function AddTripDrawer({ visible, onClose }: AddTripDrawerProps) {
           </SafeAreaView>
         </Modal>
 
-        {/* Success Modal */}
-        <Modal
-          visible={showSuccessModal}
-          transparent
-          animationType="fade"
-          onRequestClose={handleGoToTrips}
-        >
-          <View style={styles.successModalOverlay}>
-            <View style={styles.successModalContent}>
-              <Pressable
-                style={styles.successModalCloseButton}
-                onPress={handleGoToTrips}
-              >
-                <Text style={styles.successModalCloseButtonText}>✕</Text>
-              </Pressable>
-
-              <Text style={styles.successModalTitle}>Trip Added!</Text>
-
-              <View style={styles.successIconContainer}>
-                <View style={styles.successIconOuter}>
-                  <View style={styles.successIconInner}>
-                    <Text style={styles.successIconCheck}>✓</Text>
-                  </View>
-                </View>
-                <Text style={styles.successSparkle1}>✦</Text>
-                <Text style={styles.successSparkle2}>✦</Text>
-                <Text style={styles.successSparkle3}>✦</Text>
-                <Text style={styles.successSparkle4}>✦</Text>
-              </View>
-
-              <Pressable
-                style={styles.successPrimaryButton}
-                onPress={handleAddAnotherTrip}
-              >
-                <Text style={styles.successPrimaryButtonText}>
-                  Add another trip
-                </Text>
-              </Pressable>
-
-              <Pressable
-                style={styles.successSecondaryButton}
-                onPress={handleGoToTrips}
-              >
-                <Text style={styles.successSecondaryButtonText}>
-                  Go back to Trips
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-        </Modal>
-
         {/* Sticky footer */}
         <View style={styles.footer}>
-          <View style={styles.footerSummary}>
-            <Text style={styles.footerLabel}>
-              Value: <Text style={styles.footerValue}>$ {deductionValue}</Text>
-            </Text>
-            <Text style={styles.footerLabel}>
-              Distance:{" "}
-              <Text style={styles.footerValue}>{distance || "0"} mi</Text>
-            </Text>
-          </View>
           <Pressable
             style={[
-              styles.addButton,
-              (parseFloat(distance) === 0 || isSaving) &&
-                styles.addButtonDisabled,
+              styles.saveButton,
+              (!hasChanges || isSaving) && styles.saveButtonDisabled,
             ]}
-            disabled={parseFloat(distance) === 0 || isSaving}
-            onPress={() => handleAddTrip()}
+            disabled={!hasChanges || isSaving}
+            onPress={handleSaveTrip}
           >
             {isSaving ? (
               <ActivityIndicator size="small" color={colors.white} />
             ) : (
               <Text
                 style={[
-                  styles.addButtonText,
-                  parseFloat(distance) === 0 && styles.addButtonTextDisabled,
+                  styles.saveButtonText,
+                  !hasChanges && styles.saveButtonTextDisabled,
                 ]}
               >
-                Add drive
+                Save
               </Text>
             )}
           </Pressable>
@@ -757,36 +736,31 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     position: "relative",
   },
-  mapExpandButton: {
-    position: "absolute",
-    bottom: 16,
-    right: 16,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.white,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  mapExpandButtonText: {
-    fontSize: 16,
-    color: colors.text.primary,
-  },
   content: {
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 40,
   },
-  title: {
-    fontSize: 24,
+  dateHeader: {
+    fontSize: 16,
+    color: colors.text.secondary,
+    marginBottom: 8,
+  },
+  statsRow: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    gap: 16,
+    marginBottom: 24,
+  },
+  deductionDisplay: {
+    fontSize: 28,
     fontWeight: "bold",
     color: colors.text.primary,
-    marginBottom: 24,
+  },
+  distanceDisplay: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: colors.text.primary,
   },
   inputRow: {
     flexDirection: "row",
@@ -814,23 +788,6 @@ const styles = StyleSheet.create({
   chevron: {
     fontSize: 12,
     color: colors.text.muted,
-  },
-  datePickerContainer: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    marginBottom: 12,
-    overflow: "hidden",
-  },
-  datePickerDone: {
-    alignItems: "flex-end",
-    padding: 12,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  datePickerDoneText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.primary,
   },
   locationContainer: {
     backgroundColor: colors.white,
@@ -891,47 +848,25 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     textAlignVertical: "top",
   },
-  metricsRow: {
-    flexDirection: "row",
-    gap: 12,
-    marginBottom: 12,
-  },
-  metricItem: {
-    flex: 1,
-  },
-  metricLabel: {
-    fontSize: 14,
-    color: colors.text.secondary,
-    marginBottom: 8,
-  },
-  metricInputRow: {
-    flexDirection: "row",
+  deleteButton: {
+    paddingVertical: 16,
     alignItems: "center",
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    marginTop: 8,
   },
-  metricValue: {
-    flex: 1,
+  deleteButtonText: {
     fontSize: 16,
-    color: colors.text.primary,
-  },
-  metricUnit: {
-    fontSize: 16,
-    color: colors.text.muted,
+    fontWeight: "500",
+    color: colors.error,
   },
   footerSpacer: {
-    height: 140,
+    height: 120,
   },
   footer: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: colors.background,
+    backgroundColor: colors.white,
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 40,
@@ -943,36 +878,23 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
-  footerSummary: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 16,
-  },
-  footerLabel: {
-    fontSize: 16,
-    color: colors.text.secondary,
-  },
-  footerValue: {
-    fontWeight: "600",
-    color: colors.text.primary,
-  },
-  addButton: {
+  saveButton: {
     backgroundColor: colors.primary,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: "center",
   },
-  addButtonDisabled: {
+  saveButtonDisabled: {
     backgroundColor: colors.tabBar.lightInactive,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  addButtonText: {
+  saveButtonText: {
     fontSize: 16,
     fontWeight: "600",
     color: colors.white,
   },
-  addButtonTextDisabled: {
+  saveButtonTextDisabled: {
     color: colors.text.primary,
   },
   // Classification picker styles
@@ -1043,128 +965,4 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     marginTop: 2,
   },
-  // Success modal styles
-  successModalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  successModalContent: {
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    padding: 24,
-    width: "100%",
-    maxWidth: 340,
-    alignItems: "center",
-  },
-  successModalCloseButton: {
-    position: "absolute",
-    top: 16,
-    right: 16,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  successModalCloseButtonText: {
-    fontSize: 20,
-    color: colors.text.primary,
-  },
-  successModalTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: colors.text.primary,
-    marginTop: 8,
-    marginBottom: 32,
-  },
-  successIconContainer: {
-    position: "relative",
-    width: 120,
-    height: 120,
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 40,
-  },
-  successIconOuter: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: colors.accent,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  successIconInner: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: colors.success,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  successIconCheck: {
-    fontSize: 40,
-    color: colors.white,
-    fontWeight: "bold",
-  },
-  successSparkle1: {
-    position: "absolute",
-    top: 10,
-    left: 20,
-    fontSize: 16,
-    color: colors.warning,
-  },
-  successSparkle2: {
-    position: "absolute",
-    top: 25,
-    right: 15,
-    fontSize: 12,
-    color: colors.warning,
-  },
-  successSparkle3: {
-    position: "absolute",
-    bottom: 20,
-    left: 15,
-    fontSize: 10,
-    color: colors.warning,
-  },
-  successSparkle4: {
-    position: "absolute",
-    bottom: 10,
-    right: 25,
-    fontSize: 18,
-    color: colors.warning,
-  },
-  successPrimaryButton: {
-    backgroundColor: colors.primary,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    width: "100%",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  successPrimaryButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.white,
-  },
-  successSecondaryButton: {
-    backgroundColor: colors.white,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 12,
-    width: "100%",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  successSecondaryButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.text.primary,
-  },
 });
-

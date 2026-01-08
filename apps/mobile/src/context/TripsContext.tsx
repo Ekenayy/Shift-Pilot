@@ -43,6 +43,7 @@ interface TripsContextType {
   // CRUD operations
   refreshTrips: () => Promise<void>;
   addTrip: (params: CreateManualTripParams) => Promise<Trip>;
+  editTrip: (tripId: string, params: CreateManualTripParams) => Promise<void>;
   classifyTrip: (tripId: string, purpose: TripPurpose) => Promise<void>;
   deleteTrip: (tripId: string) => Promise<void>;
   toggleFavorite: (tripId: string) => Promise<void>;
@@ -159,6 +160,22 @@ export function TripsProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  // Edit an existing trip
+  const editTrip = useCallback(
+    async (tripId: string, params: CreateManualTripParams) => {
+      try {
+        const updatedTrip = await tripService.updateManualTrip(tripId, params);
+        setTrips((prev) =>
+          prev.map((t) => (t.id === tripId ? updatedTrip : t))
+        );
+      } catch (err) {
+        console.error("[TripsContext] Error editing trip:", err);
+        throw err;
+      }
+    },
+    []
+  );
+
   // Classify trip
   const classifyTrip = useCallback(
     async (tripId: string, purpose: TripPurpose) => {
@@ -224,6 +241,7 @@ export function TripsProvider({ children }: { children: ReactNode }) {
     setViewMode,
     refreshTrips,
     addTrip,
+    editTrip,
     classifyTrip,
     deleteTrip,
     toggleFavorite,

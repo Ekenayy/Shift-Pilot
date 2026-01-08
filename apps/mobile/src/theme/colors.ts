@@ -8,28 +8,29 @@ export const colors = {
 
   // Semantic colors
   text: {
-    primary: "#34435E",
-    secondary: "#6B7280",
-    muted: "#B4B5B8",
-    inverse: "#FFFFFF",
+    primary: "#34435E", // Dark blue/navy - main brand color
+    secondary: "#6B7280", // Gray - secondary text
+    muted: "#B4B5B8", // Gray - inactive states, secondary text
+    inverse: "#FFFFFF", // White - cards, inputs
   },
 
   // UI states
   tabBar: {
-    background: "#FFFFFF",
-    active: "#34435E",
-    inactive: "#B4B5B8",
-    addButton: "#34435E",
+    background: "#FFFFFF", // White - tab bar background  
+    active: "#34435E", // Dark blue/navy - main brand color
+    inactive: "#B4B5B8", // Gray - inactive states, secondary text
+    addButton: "#34435E", // Dark blue/navy - main brand color
+    lightInactive: '#cdced2', // Light gray - inactive states, secondary text
   },
 
   // Feedback colors
-  success: "#4CAF50",
-  warning: "#FF9800",
-  error: "#F44336",
+  success: "#4CAF50", // Green - success
+  warning: "#FF9800", // Orange - warning
+  error: "#F44336", // Red - error
 
   // Cards and surfaces
-  card: "#FFFFFF",
-  border: "#E5E7EB",
+  card: "#FFFFFF", // White - cards, inputs
+  border: "#E5E7EB", // Gray - borders
 };
 
 export type Colors = typeof colors;

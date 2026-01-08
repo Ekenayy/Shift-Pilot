@@ -1,12 +1,14 @@
 import { View, Text, StyleSheet, Pressable, Alert } from "react-native";
 import { colors } from "../theme/colors";
 import { useTrips, type ViewMode } from "../context/TripsContext";
+import { useEditTrip } from "../context/EditTripContext";
 import { SegmentedTabs } from "../components/common";
 import {
   TripSummaryHeader,
   TripFilters,
   TripsList,
 } from "../components/trips";
+import type { Trip } from "../types/database";
 
 const VIEW_MODE_OPTIONS: ViewMode[] = ["trips", "daily", "weekly", "monthly"];
 const VIEW_MODE_LABELS: Record<ViewMode, string> = {
@@ -33,6 +35,7 @@ export default function TripsScreen() {
     isLoading,
     isRefreshing,
   } = useTrips();
+  const { openEditDrawer } = useEditTrip();
 
   const handleClassify = (tripId: string) => {
     Alert.alert(
@@ -79,6 +82,10 @@ export default function TripsScreen() {
         },
       ]
     );
+  };
+
+  const handleEdit = (trip: Trip) => {
+    openEditDrawer(trip);
   };
 
   return (
@@ -134,6 +141,7 @@ export default function TripsScreen() {
           onClassify={handleClassify}
           onDelete={handleDelete}
           onToggleFavorite={toggleFavorite}
+          onEdit={handleEdit}
         />
       </View>
     </View>
