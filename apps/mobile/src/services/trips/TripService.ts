@@ -333,9 +333,9 @@ class TripService {
       classification_status: "manually_classified",
     };
 
-    const { data, error } = await supabase
-      .from("trips")
-      .update(updateData as any)
+    const { data, error } = await (supabase
+      .from("trips") as any)
+      .update(updateData)
       .eq("id", tripId)
       .select()
       .single();
@@ -354,9 +354,9 @@ class TripService {
     const trip = await this.getTrip(tripId);
     if (!trip) throw new Error("Trip not found");
 
-    const { data, error } = await supabase
-      .from("trips")
-      .update({ is_favorite: !trip.is_favorite } as any)
+    const { data, error } = await (supabase
+      .from("trips") as any)
+      .update({ is_favorite: !trip.is_favorite })
       .eq("id", tripId)
       .select()
       .single();
@@ -371,9 +371,9 @@ class TripService {
 
   // Update trip notes
   async updateNotes(tripId: string, notes: string): Promise<Trip> {
-    const { data, error } = await supabase
-      .from("trips")
-      .update({ notes } as any)
+    const { data, error } = await (supabase
+      .from("trips") as any)
+      .update({ notes })
       .eq("id", tripId)
       .select()
       .single();
@@ -438,9 +438,9 @@ class TripService {
         purpose === "unknown" ? "unclassified" : "manually_classified",
     };
 
-    const { data, error } = await supabase
-      .from("trips")
-      .update(updateData as any)
+    const { data, error } = await (supabase
+      .from("trips") as any)
+      .update(updateData)
       .eq("id", tripId)
       .select()
       .single();

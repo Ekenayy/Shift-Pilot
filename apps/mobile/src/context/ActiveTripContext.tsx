@@ -394,7 +394,7 @@ export function ActiveTripProvider({ children }: { children: ReactNode }) {
     tripDetectionService.addCallback(detectionCallback);
 
     return true;
-  }, [handleTripDetectionEvent]);
+  }, []);
 
   // Disable auto-detect mode
   const disableAutoDetect = useCallback(async () => {
