@@ -31,7 +31,6 @@ export default function TripsScreen() {
     refreshTrips,
     classifyTrip,
     deleteTrip,
-    toggleFavorite,
     isLoading,
     isRefreshing,
   } = useTrips();
@@ -140,7 +139,6 @@ export default function TripsScreen() {
           onRefresh={refreshTrips}
           onClassify={handleClassify}
           onDelete={handleDelete}
-          onToggleFavorite={toggleFavorite}
           onEdit={handleEdit}
         />
       </View>

@@ -20,7 +20,6 @@ interface TripsListProps {
   onRefresh: () => void;
   onClassify: (tripId: string) => void;
   onDelete: (tripId: string) => void;
-  onToggleFavorite: (tripId: string) => void;
   onEdit?: (trip: Trip) => void;
 }
 
@@ -125,7 +124,6 @@ export function TripsList({
   onRefresh,
   onClassify,
   onDelete,
-  onToggleFavorite,
   onEdit,
 }: TripsListProps) {
   if (isLoading && trips.length === 0) {
@@ -147,7 +145,6 @@ export function TripsList({
           trip={trip}
           onClassify={onClassify}
           onDelete={onDelete}
-          onToggleFavorite={onToggleFavorite}
           onEdit={onEdit}
         />
       ))}

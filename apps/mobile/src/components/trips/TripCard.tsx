@@ -8,7 +8,6 @@ interface TripCardProps {
   trip: Trip;
   onClassify: (tripId: string) => void;
   onDelete: (tripId: string) => void;
-  onToggleFavorite: (tripId: string) => void;
   onAddNotes?: (tripId: string) => void;
   onEdit?: (trip: Trip) => void;
 }
@@ -37,7 +36,6 @@ export function TripCard({
   trip,
   onClassify,
   onDelete,
-  onToggleFavorite,
   onAddNotes,
   onEdit,
 }: TripCardProps) {
@@ -135,14 +133,6 @@ export function TripCard({
           <Text style={styles.actionIcon}>🚗</Text>
         </Pressable>
         <View style={styles.actionSpacer} />
-        <Pressable
-          style={styles.actionButton}
-          onPress={() => onToggleFavorite(trip.id)}
-        >
-          <Text style={styles.actionIcon}>
-            {trip.is_favorite ? "⭐" : "☆"}
-          </Text>
-        </Pressable>
         <Pressable
           style={styles.actionButton}
           onPress={() => onDelete(trip.id)}

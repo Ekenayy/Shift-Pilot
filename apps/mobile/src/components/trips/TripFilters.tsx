@@ -15,19 +15,11 @@ export function TripFilters({
 }: TripFiltersProps) {
   const isUnclassifiedActive =
     filters.classificationStatus === "unclassified";
-  const isFavoritesActive = filters.isFavorite === true;
 
   const toggleUnclassified = () => {
     onChange({
       ...filters,
       classificationStatus: isUnclassifiedActive ? "all" : "unclassified",
-    });
-  };
-
-  const toggleFavorites = () => {
-    onChange({
-      ...filters,
-      isFavorite: isFavoritesActive ? undefined : true,
     });
   };
 
@@ -72,20 +64,6 @@ export function TripFilters({
       <Pressable style={styles.chip}>
         <Text style={styles.chipText}>Date range</Text>
         <Text style={styles.chipArrow}>▼</Text>
-      </Pressable>
-
-      <Pressable
-        style={[styles.chip, isFavoritesActive && styles.chipActive]}
-        onPress={toggleFavorites}
-      >
-        <Text
-          style={[
-            styles.chipText,
-            isFavoritesActive && styles.chipTextActive,
-          ]}
-        >
-          Favorites
-        </Text>
       </Pressable>
     </ScrollView>
   );
