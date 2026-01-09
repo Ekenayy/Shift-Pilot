@@ -1,0 +1,38 @@
+{
+  "cli": {
+    "version": ">= 16.28.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal"
+    },
+    "preview-testflight": {
+      "autoIncrement": true,
+      "extends": "preview",
+      "distribution": "store",
+      "ios": {
+        "simulator": false
+      }
+    },
+    "production": {
+      "autoIncrement": true
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "ekenayy@gmail.com"
+      }
+    },
+    "preview-testflight": {
+      "ios": {
+        "appleId": "ekenayy@gmail.com"
+      }
+    }
+  }
+}

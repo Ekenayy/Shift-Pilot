@@ -6,6 +6,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: "shift-pilot",
   version: "1.0.0",
   orientation: "portrait",
+  icon: "./assets/icon.png",
   userInterfaceStyle: "automatic",
   plugins: [
     "expo-web-browser",
@@ -52,6 +53,9 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     ],
   },
   extra: {
+    eas: {
+      "projectId": "aec6787a-00ea-4f2a-9a8d-4299281eb5cc"
+    },
     googleIosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID,
     googleAndroidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID,
     googlePlacesApiKey: process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY,

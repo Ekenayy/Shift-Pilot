@@ -66,6 +66,11 @@ Based on core assumptions that must validate:
 
 ---
 
+## UI/UX Best Practices 
+- Always provide feedback to a user for CRUD actions. Ex: If we create "delete" functionality, we need to gracefully confirm the to the user that the item was deleted. 
+
+---
+
 ## Naming Conventions
 
 - Screens: `*Screen.tsx` in `src/screens/`

@@ -10,19 +10,22 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { AuthProvider } from "./context/AuthContext";
 import { TripsProvider } from "./context/TripsContext";
 import { ActiveTripProvider } from "./context/ActiveTripContext";
+import { ErrorBoundary } from "./components/common";
 import RootNavigator from "./navigation/RootNavigator";
 
 export default function App() {
   return (
-    <AuthProvider>
-      <TripsProvider>
-        <ActiveTripProvider>
-          <SafeAreaProvider>
-            <RootNavigator />
-            <StatusBar style="light" />
-          </SafeAreaProvider>
-        </ActiveTripProvider>
-      </TripsProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <TripsProvider>
+          <ActiveTripProvider>
+            <SafeAreaProvider>
+              <RootNavigator />
+              <StatusBar style="light" />
+            </SafeAreaProvider>
+          </ActiveTripProvider>
+        </TripsProvider>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 }
