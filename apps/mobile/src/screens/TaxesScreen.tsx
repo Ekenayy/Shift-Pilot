@@ -7,6 +7,7 @@ import {
   ScrollView,
   Dimensions,
 } from "react-native";
+import Svg, { Circle, G } from "react-native-svg";
 import { colors } from "../theme/colors";
 import { SegmentedTabs } from "../components/common";
 import { useTrips } from "../context/TripsContext";
@@ -40,6 +41,16 @@ interface MonthData {
   isComplete: boolean;
 }
 
+interface CategoryBreakdown {
+  purpose: string;
+  label: string;
+  icon: string;
+  color: string;
+  drives: number;
+  miles: number;
+  deductions: number;
+}
+
 interface MonthStats {
   drives: number;
   miles: number;
@@ -48,7 +59,21 @@ interface MonthStats {
   deductions: number;
   completionPercent: number;
   monthName: string;
+  categories: CategoryBreakdown[];
 }
+
+// Deductible categories configuration
+const DEDUCTION_CATEGORIES = [
+  { purpose: "work", label: "Business", icon: "💼", color: "#1E88E5" },
+  { purpose: "charity", label: "Charity", icon: "❤️", color: "#E91E63" },
+  { purpose: "medical", label: "Medical", icon: "🏥", color: "#4CAF50" },
+  { purpose: "military", label: "Military", icon: "🎖️", color: "#FF9800" },
+] as const;
+
+// Non-deductible categories
+const NON_DEDUCTIBLE_CATEGORIES = [
+  { purpose: "personal", label: "Personal", icon: "🏠", color: "#FDD835" },
+] as const;
 
 export default function TaxesScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>("Month");
@@ -72,11 +97,44 @@ export default function TaxesScreen() {
       const businessTrips = monthTrips.filter((t) => t.purpose === "work");
       const personalTrips = monthTrips.filter((t) => t.purpose === "personal");
       const totalMiles = monthTrips.reduce((sum, t) => sum + (t.distance_miles || 0), 0);
-      const totalDeductions = businessTrips.reduce((sum, t) => sum + (t.deduction_value || 0), 0);
+      
+      // Calculate deductions from all deductible categories
+      const deductibleTrips = monthTrips.filter((t) => 
+        t.purpose === "work" || t.purpose === "charity" || t.purpose === "medical" || t.purpose === "military"
+      );
+      const totalDeductions = deductibleTrips.reduce((sum, t) => sum + (t.deduction_value || 0), 0);
+      
       const unclassified = monthTrips.filter((t) => t.classification_status === "unclassified").length;
       const completionPercent = monthTrips.length > 0 
         ? Math.round(((monthTrips.length - unclassified) / monthTrips.length) * 100)
         : 100;
+
+      // Build category breakdowns for deductible categories
+      const categories: CategoryBreakdown[] = DEDUCTION_CATEGORIES.map((cat) => {
+        const catTrips = monthTrips.filter((t) => t.purpose === cat.purpose);
+        return {
+          purpose: cat.purpose,
+          label: cat.label,
+          icon: cat.icon,
+          color: cat.color,
+          drives: catTrips.length,
+          miles: Math.round(catTrips.reduce((sum, t) => sum + (t.distance_miles || 0), 0)),
+          deductions: Math.round(catTrips.reduce((sum, t) => sum + (t.deduction_value || 0), 0)),
+        };
+      }).filter((cat) => cat.drives > 0); // Only include categories with drives
+
+      // Add personal category (non-deductible)
+      if (personalTrips.length > 0) {
+        categories.push({
+          purpose: "personal",
+          label: "Personal",
+          icon: "🏠",
+          color: "#FDD835",
+          drives: personalTrips.length,
+          miles: Math.round(personalTrips.reduce((sum, t) => sum + (t.distance_miles || 0), 0)),
+          deductions: 0, // Personal is not deductible
+        });
+      }
 
       return {
         drives: monthTrips.length,
@@ -86,6 +144,7 @@ export default function TaxesScreen() {
         deductions: Math.round(totalDeductions),
         completionPercent,
         monthName: format(selectedDate, "MMMM"),
+        categories,
       };
     } else {
       // Year view - get monthly breakdown
@@ -222,9 +281,12 @@ function MonthView({
   onSendReport: () => void;
   onViewAllDrives: () => void;
 }) {
-  const total = stats.businessDrives + stats.personalDrives;
-  const businessPercent = total > 0 ? (stats.businessDrives / total) * 100 : 0;
-  const personalPercent = total > 0 ? (stats.personalDrives / total) * 100 : 0;
+  // Calculate percentages for each category based on drives
+  const totalDrives = stats.categories.reduce((sum, cat) => sum + cat.drives, 0);
+  const categoryPercentages = stats.categories.map((cat) => ({
+    ...cat,
+    percent: totalDrives > 0 ? (cat.drives / totalDrives) * 100 : 0,
+  }));
 
   return (
     <View style={styles.card}>
@@ -255,25 +317,22 @@ function MonthView({
           {/* Divider */}
           <View style={styles.divider} />
 
-          {/* Donut Chart */}
+          {/* Donut Chart with Categories */}
           <View style={styles.chartContainer}>
-            <DonutChart
-              businessPercent={businessPercent}
-              personalPercent={personalPercent}
-              businessCount={stats.businessDrives}
-              personalCount={stats.personalDrives}
-            />
+            <MultiCategoryDonutChart categories={categoryPercentages} />
             <View style={styles.legend}>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: "#1E88E5" }]} />
-                <Text style={styles.legendIcon}>💼</Text>
-                <Text style={styles.legendText}>{stats.businessDrives} Business Drives</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: "#FDD835" }]} />
-                <Text style={styles.legendIcon}>🏠</Text>
-                <Text style={styles.legendText}>{stats.personalDrives} Personal Drives</Text>
-              </View>
+              {stats.categories.map((cat) => (
+                <View key={cat.purpose} style={styles.legendItem}>
+                  <View style={[styles.legendDot, { backgroundColor: cat.color }]} />
+                  <Text style={styles.legendIcon}>{cat.icon}</Text>
+                  <Text style={styles.legendText}>
+                    {cat.drives} {cat.label} {cat.drives === 1 ? "Drive" : "Drives"}
+                  </Text>
+                </View>
+              ))}
+              {stats.categories.length === 0 && (
+                <Text style={styles.noDataText}>No drives this month</Text>
+              )}
             </View>
           </View>
 
@@ -394,136 +453,69 @@ function YearView({
   );
 }
 
-// Donut Chart Component - Fixed to only show segments with data
-function DonutChart({
-  businessPercent,
-  personalPercent,
-  businessCount,
-  personalCount,
+// SVG-based Donut Chart Component with proper arc rendering
+function MultiCategoryDonutChart({
+  categories,
 }: {
-  businessPercent: number;
-  personalPercent: number;
-  businessCount: number;
-  personalCount: number;
+  categories: (CategoryBreakdown & { percent: number })[];
 }) {
   const size = 140;
   const strokeWidth = 24;
-  const center = size / 2;
   const radius = (size - strokeWidth) / 2;
-  
-  // Calculate angles (starting from top, going clockwise)
-  // Business starts at top (-90 degrees)
-  const businessAngle = (businessPercent / 100) * 360;
-  const personalAngle = (personalPercent / 100) * 360;
-  
-  // If no data, show empty ring
-  const hasData = businessCount > 0 || personalCount > 0;
+  const circumference = 2 * Math.PI * radius;
+  const center = size / 2;
 
-  // Helper to create arc path coordinates for positioning icons
-  const getPositionOnArc = (angleDegrees: number) => {
-    const angleRad = ((angleDegrees - 90) * Math.PI) / 180;
+  // Filter to only categories with drives
+  const segments = categories.filter((cat) => cat.drives > 0);
+
+  // Calculate stroke dash values for each segment
+  let cumulativePercent = 0;
+  const segmentData = segments.map((cat) => {
+    const strokeDasharray = circumference;
+    const segmentLength = (cat.percent / 100) * circumference;
+    const gapLength = circumference - segmentLength;
+    const offset = circumference * 0.25 - (cumulativePercent / 100) * circumference; // Start from top
+    
+    cumulativePercent += cat.percent;
+    
     return {
-      x: center + radius * Math.cos(angleRad),
-      y: center + radius * Math.sin(angleRad),
+      ...cat,
+      strokeDasharray: `${segmentLength} ${gapLength}`,
+      strokeDashoffset: offset,
     };
-  };
-
-  // Position icons at the middle of each segment
-  const businessIconPos = businessCount > 0 
-    ? getPositionOnArc(businessAngle / 2) 
-    : null;
-  const personalIconPos = personalCount > 0 
-    ? getPositionOnArc(businessAngle + personalAngle / 2) 
-    : null;
+  });
 
   return (
     <View style={[styles.donutContainer, { width: size, height: size }]}>
-      {/* Background ring */}
-      <View style={[styles.donutRing, { 
-        width: size, 
-        height: size, 
-        borderRadius: size / 2,
-        borderWidth: strokeWidth,
-        borderColor: colors.background,
-      }]} />
-      
-      {hasData && (
-        <>
-          {/* Business segment (blue) - only show if has business drives */}
-          {businessCount > 0 && (
-            <View
-              style={[
-                styles.donutSegmentWrapper,
-                { width: size, height: size },
-              ]}
-            >
-              <View
-                style={[
-                  styles.donutArc,
-                  {
-                    width: size,
-                    height: size,
-                    borderRadius: size / 2,
-                    borderWidth: strokeWidth,
-                    borderColor: "transparent",
-                    borderTopColor: "#1E88E5",
-                    borderRightColor: businessAngle > 90 ? "#1E88E5" : "transparent",
-                    borderBottomColor: businessAngle > 180 ? "#1E88E5" : "transparent",
-                    borderLeftColor: businessAngle > 270 ? "#1E88E5" : "transparent",
-                    transform: [{ rotate: "-90deg" }],
-                  },
-                ]}
-              />
-            </View>
-          )}
-          
-          {/* Personal segment (yellow) - only show if has personal drives */}
-          {personalCount > 0 && (
-            <View
-              style={[
-                styles.donutSegmentWrapper,
-                { width: size, height: size },
-              ]}
-            >
-              <View
-                style={[
-                  styles.donutArc,
-                  {
-                    width: size,
-                    height: size,
-                    borderRadius: size / 2,
-                    borderWidth: strokeWidth,
-                    borderColor: "transparent",
-                    borderTopColor: "#FDD835",
-                    borderRightColor: personalAngle > 90 ? "#FDD835" : "transparent",
-                    borderBottomColor: personalAngle > 180 ? "#FDD835" : "transparent",
-                    borderLeftColor: personalAngle > 270 ? "#FDD835" : "transparent",
-                    transform: [{ rotate: `${businessAngle - 90}deg` }],
-                  },
-                ]}
-              />
-            </View>
-          )}
-        </>
-      )}
-
-      {/* Icons positioned on segments */}
-      {personalIconPos && (
-        <View style={[styles.donutIconWrapper, { 
-          left: personalIconPos.x - 12, 
-          top: personalIconPos.y - 12 
-        }]}>
-          <Text style={styles.donutSegmentIcon}>🏠</Text>
-        </View>
-      )}
-      {businessIconPos && (
-        <View style={[styles.donutIconWrapper, { 
-          left: businessIconPos.x - 12, 
-          top: businessIconPos.y - 12 
-        }]}>
-          <Text style={styles.donutSegmentIcon}>💼</Text>
-        </View>
-      )}
+      <Svg width={size} height={size}>
+        {/* Background circle */}
+        <Circle
+          cx={center}
+          cy={center}
+          r={radius}
+          fill="none"
+          stroke={colors.background}
+          strokeWidth={strokeWidth}
+        />
+        
+        {/* Render each segment */}
+        <G>
+          {segmentData.map((segment, index) => (
+            <Circle
+              key={`segment-${index}`}
+              cx={center}
+              cy={center}
+              r={radius}
+              fill="none"
+              stroke={segment.color}
+              strokeWidth={strokeWidth}
+              strokeDasharray={segment.strokeDasharray}
+              strokeDashoffset={segment.strokeDashoffset}
+              strokeLinecap="butt"
+            />
+          ))}
+        </G>
+      </Svg>
     </View>
   );
 }
@@ -638,25 +630,6 @@ const styles = StyleSheet.create({
   donutContainer: {
     position: "relative",
   },
-  donutRing: {
-    position: "absolute",
-  },
-  donutSegmentWrapper: {
-    position: "absolute",
-  },
-  donutArc: {
-    position: "absolute",
-  },
-  donutIconWrapper: {
-    position: "absolute",
-    width: 24,
-    height: 24,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  donutSegmentIcon: {
-    fontSize: 16,
-  },
   legend: {
     flex: 1,
     gap: 12,
@@ -680,6 +653,18 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: 14,
     color: colors.text.primary,
+    flex: 1,
+  },
+  legendDeduction: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.success,
+    marginLeft: 8,
+  },
+  noDataText: {
+    fontSize: 14,
+    color: colors.text.muted,
+    fontStyle: "italic",
   },
   primaryButton: {
     flexDirection: "row",
