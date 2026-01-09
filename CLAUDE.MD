@@ -112,3 +112,6 @@ MVP = tracking + money framing + recaps. Everything else is future scope.
 ## Rules on adding Packages
 - Before adding a package make sure it is not deprecated and has had some new releases in the past 2 years. If it hasn't seen a new release in 2 years, ask me first before adding it
 - Make sure to install the most recent stable version of any package you're adding unless we're specifically fixing dependency tree issues. 
+
+## Documentation Rules
+- After completing a new feature, be sure to add it in done-so-far.md in `docs/done-so-far`
