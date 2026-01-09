@@ -293,6 +293,30 @@ function MonthView({
   );
 }
 
+// Helper to calculate nice axis values
+function calculateAxisValues(maxValue: number, tickCount: number = 5): number[] {
+  if (maxValue <= 0) return [0, 8, 16, 24, 32]; // Default when no data
+  
+  // Round up to a nice number for the max
+  const magnitude = Math.pow(10, Math.floor(Math.log10(maxValue)));
+  const normalized = maxValue / magnitude;
+  
+  let niceMax: number;
+  if (normalized <= 1) niceMax = magnitude;
+  else if (normalized <= 2) niceMax = 2 * magnitude;
+  else if (normalized <= 5) niceMax = 5 * magnitude;
+  else niceMax = 10 * magnitude;
+  
+  // Ensure niceMax is at least as big as maxValue
+  while (niceMax < maxValue) {
+    niceMax += magnitude;
+  }
+  
+  // Generate tick values
+  const step = niceMax / (tickCount - 1);
+  return Array.from({ length: tickCount }, (_, i) => Math.round(i * step));
+}
+
 // Year View Component
 function YearView({
   stats,
@@ -309,6 +333,10 @@ function YearView({
   };
   onSendReport: () => void;
 }) {
+  // Calculate dynamic axis values based on max deduction
+  const axisValues = calculateAxisValues(stats.maxDeduction);
+  const chartMax = axisValues[axisValues.length - 1] || 1;
+
   return (
     <View style={styles.card}>
       {/* Year Header */}
@@ -330,16 +358,14 @@ function YearView({
 
       {/* Bar Chart */}
       <View style={styles.barChartContainer}>
-        {/* X-axis labels */}
+        {/* X-axis labels - Dynamic */}
         <View style={styles.xAxisLabels}>
-          <Text style={styles.xLabel}>$ 0</Text>
-          <Text style={styles.xLabel}>$ 8</Text>
-          <Text style={styles.xLabel}>$ 16</Text>
-          <Text style={styles.xLabel}>$ 24</Text>
-          <Text style={styles.xLabel}>$ 32</Text>
+          {axisValues.map((value, index) => (
+            <Text key={`axis-${index}`} style={styles.xLabel}>$ {value}</Text>
+          ))}
         </View>
 
-        {/* Bars */}
+        {/* Bars - Scale based on chartMax */}
         <View style={styles.barsContainer}>
           {[...stats.monthlyData].reverse().map((month) => (
             <View key={month.month} style={styles.barRow}>
@@ -349,7 +375,7 @@ function YearView({
                   style={[
                     styles.barFill,
                     {
-                      width: `${(month.deductions / (stats.maxDeduction || 1)) * 100}%`,
+                      width: `${(month.deductions / chartMax) * 100}%`,
                     },
                   ]}
                 />
