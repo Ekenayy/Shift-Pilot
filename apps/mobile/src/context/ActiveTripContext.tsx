@@ -77,6 +77,16 @@ export function ActiveTripProvider({ children }: { children: ReactNode }) {
   const locationCallbackRef = useRef<((location: LocationUpdate) => void) | null>(null);
   const lastSaveTimeRef = useRef<number>(0);
   const tripDetectionCallbackRef = useRef<any>(null);
+  
+  // Refs to avoid stale closure issues in callbacks
+  const isTrackingRef = useRef(isTracking);
+  const trackingModeRef = useRef(trackingMode);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    isTrackingRef.current = isTracking;
+    trackingModeRef.current = trackingMode;
+  }, [isTracking, trackingMode]);
 
   // Load business rate on mount
   useEffect(() => {
@@ -438,9 +448,16 @@ export function ActiveTripProvider({ children }: { children: ReactNode }) {
       event: "trip_started" | "trip_stopped" | "trip_updated",
       data: { locations: LocationUpdate[]; distance: number; duration: number }
     ) => {
+      console.log(`[ActiveTrip] Detection event: ${event}`, {
+        distance: `${data.distance.toFixed(0)}m`,
+        locations: data.locations.length,
+        duration: `${(data.duration / 1000).toFixed(0)}s`,
+      });
+
       if (event === "trip_started") {
         // Don't start auto trip if manual trip is in progress
-        if (isTracking && trackingMode === "manual") {
+        // Use refs to get current values, not stale closure values
+        if (isTrackingRef.current && trackingModeRef.current === "manual") {
           console.log("[ActiveTrip] Ignoring auto-start, manual trip in progress");
           return;
         }
@@ -463,17 +480,23 @@ export function ActiveTripProvider({ children }: { children: ReactNode }) {
         // Send push notification that trip started
         notificationService.notifyTripStarted();
       } else if (event === "trip_updated") {
-        // Update current trip with new location data (only for auto mode)
-        if (isTracking && trackingMode === "auto") {
-          setCurrentTrip((prev) => {
-            if (!prev || prev.mode !== "auto") return prev;
-            return {
-              ...prev,
-              locations: data.locations,
-              distanceMeters: data.distance,
-            };
+        // Update current trip with new location data
+        // Always try to update - the setCurrentTrip callback will check if it's an auto trip
+        setCurrentTrip((prev) => {
+          if (!prev || prev.mode !== "auto") return prev;
+
+          console.log("[ActiveTrip] Updating auto trip", {
+            prevDistance: `${prev.distanceMeters.toFixed(0)}m`,
+            newDistance: `${data.distance.toFixed(0)}m`,
+            locations: data.locations.length,
           });
-        }
+
+          return {
+            ...prev,
+            locations: data.locations,
+            distanceMeters: data.distance,
+          };
+        });
       } else if (event === "trip_stopped") {
         console.log("[ActiveTrip] Auto-detected trip stopped", {
           duration: `${(data.duration / 1000).toFixed(0)}s`,
@@ -509,7 +532,7 @@ export function ActiveTripProvider({ children }: { children: ReactNode }) {
         });
       }
     },
-    [isTracking, trackingMode, businessRate]
+    [businessRate]
   );
 
   // Complete trip and save to database
