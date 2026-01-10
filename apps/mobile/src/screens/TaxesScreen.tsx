@@ -11,6 +11,7 @@ import Svg, { Circle, G } from "react-native-svg";
 import { colors } from "../theme/colors";
 import { SegmentedTabs } from "../components/common";
 import { useTrips } from "../context/TripsContext";
+import { SendReportDrawer } from "../components/exports/SendReportDrawer";
 import {
   format,
   startOfMonth,
@@ -79,6 +80,7 @@ export default function TaxesScreen() {
   const [viewMode, setViewMode] = useState<ViewMode>("Month");
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isExpanded, setIsExpanded] = useState(true);
+  const [sendReportVisible, setSendReportVisible] = useState(false);
   const { trips } = useTrips();
 
   // Calculate stats for the selected period
@@ -207,8 +209,7 @@ export default function TaxesScreen() {
   };
 
   const handleSendReport = () => {
-    // TODO: Implement export functionality
-    console.log("Send report pressed");
+    setSendReportVisible(true);
   };
 
   const handleViewAllDrives = () => {
@@ -219,6 +220,23 @@ export default function TaxesScreen() {
   const toggleExpand = () => {
     setIsExpanded((prev) => !prev);
   };
+
+  // Prepare data for SendReportDrawer
+  const reportPeriodStart = viewMode === "Month" ? startOfMonth(selectedDate) : startOfYear(selectedDate);
+  const reportPeriodEnd = viewMode === "Month" ? endOfMonth(selectedDate) : endOfYear(selectedDate);
+
+  const reportTripCounts = useMemo(() => {
+    const periodTrips = trips.filter((trip) => {
+      const tripDate = new Date(trip.started_at);
+      return tripDate >= reportPeriodStart && tripDate <= reportPeriodEnd;
+    });
+
+    return {
+      business: periodTrips.filter((t) => t.purpose === "work").length,
+      personal: periodTrips.filter((t) => t.purpose === "personal").length,
+      total: periodTrips.length,
+    };
+  }, [trips, reportPeriodStart, reportPeriodEnd]);
 
   return (
     <View style={styles.container}>
@@ -263,6 +281,15 @@ export default function TaxesScreen() {
           />
         )}
       </ScrollView>
+
+      {/* Send Report Drawer */}
+      <SendReportDrawer
+        visible={sendReportVisible}
+        onClose={() => setSendReportVisible(false)}
+        periodStart={reportPeriodStart}
+        periodEnd={reportPeriodEnd}
+        tripCounts={reportTripCounts}
+      />
     </View>
   );
 }
