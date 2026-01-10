@@ -46,6 +46,8 @@ interface ExportRequest {
   period_end: string; // YYYY-MM-DD
   format: "csv" | "pdf" | "both";
   email: string;
+  purposes?: string[]; // Optional: filter by trip purposes
+  filter_description?: string; // Optional: human-readable filter description (e.g., "Business Drives", "Personal Drives", "All Drives")
 }
 
 Deno.serve(async (req) => {
@@ -69,7 +71,10 @@ Deno.serve(async (req) => {
 
     // Parse request body
     const body: ExportRequest = await req.json();
-    const { period_start, period_end, format, email } = body;
+    const { period_start, period_end, format, email, purposes, filter_description } = body;
+
+    // Use filter description or default to "All Drives"
+    const filterDesc = filter_description || "All Drives";
 
     // Validate request
     if (!period_start || !period_end || !format || !email) {
@@ -104,12 +109,18 @@ Deno.serve(async (req) => {
     }
 
     // Query trips for the period (RLS automatically filters by user)
-    const { data: trips, error: tripsError } = await supabase
+    let query = supabase
       .from("trips")
       .select("*")
       .gte("started_at", `${period_start}T00:00:00`)
-      .lte("started_at", `${period_end}T23:59:59`)
-      .order("started_at", { ascending: true });
+      .lte("started_at", `${period_end}T23:59:59`);
+
+    // Apply purpose filter if provided
+    if (purposes && purposes.length > 0) {
+      query = query.in("purpose", purposes);
+    }
+
+    const { data: trips, error: tripsError } = await query.order("started_at", { ascending: true });
 
     if (tripsError) {
       console.error("Error fetching trips:", tripsError);
@@ -137,7 +148,7 @@ Deno.serve(async (req) => {
     const exportRecords = [];
 
     if (format === "csv" || format === "both") {
-      const csvContent = generateCSV(trips as Trip[], period_start, period_end);
+      const csvContent = generateCSV(trips as Trip[], period_start, period_end, filterDesc);
       // Use Deno's base64 encoder to properly handle Unicode characters
       const encoder = new TextEncoder();
       const csvBytes = encoder.encode(csvContent);
@@ -160,7 +171,7 @@ Deno.serve(async (req) => {
     }
 
     if (format === "pdf" || format === "both") {
-      const pdfBytes = generatePDF(trips as Trip[], period_start, period_end);
+      const pdfBytes = generatePDF(trips as Trip[], period_start, period_end, filterDesc);
 
       // Convert Uint8Array to base64 using Deno's encoder
       const pdfBase64 = base64Encode(pdfBytes);
@@ -203,7 +214,7 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         from: "Shift-Pilot <onboarding@resend.dev>",
         to: [email],
-        subject: `Your Shift-Pilot Mileage Report (${period_start} to ${period_end})`,
+        subject: `Your Shift-Pilot Mileage Report - ${filterDesc} (${formatDateRange(period_start)} - ${formatDateRange(period_end)})`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #34435E;">Your Mileage Report is Ready</h2>
@@ -212,6 +223,7 @@ Deno.serve(async (req) => {
 
             <div style="background-color: #EBF6FF; padding: 15px; border-radius: 8px; margin: 20px 0;">
               <h3 style="color: #34435E; margin-top: 0;">Report Summary</h3>
+              <p style="margin: 5px 0;"><strong>Filter:</strong> ${filterDesc}</p>
               <p style="margin: 5px 0;"><strong>Total Trips:</strong> ${trips.length}</p>
               <p style="margin: 5px 0;"><strong>Total Miles:</strong> ${calculateTotalMiles(trips as Trip[])} mi</p>
               <p style="margin: 5px 0;"><strong>Total Deduction:</strong> $${calculateTotalDeduction(trips as Trip[])}</p>

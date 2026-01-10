@@ -11,7 +11,8 @@ interface SummaryData {
 export function generatePDF(
   trips: Trip[],
   periodStart: string,
-  periodEnd: string
+  periodEnd: string,
+  filterDescription?: string
 ): Uint8Array {
   const doc = new jsPDF();
   const summary = calculateSummary(trips);
@@ -20,7 +21,8 @@ export function generatePDF(
 
   // Header
   doc.setFontSize(20);
-  doc.text("Mileage Report", 20, yPos);
+  const title = filterDescription ? `Mileage Report - ${filterDescription}` : "Mileage Report";
+  doc.text(title, 20, yPos);
 
   yPos += 10;
   doc.setFontSize(10);

@@ -136,21 +136,44 @@ export function SendReportDrawer({
     try {
       setSendingTo(recipient.id);
 
+      // Map filter to purposes array and description
+      let purposes: string[] | undefined;
+      let filterDescription: string;
+
+      if (selectedFilter === "work") {
+        purposes = ["work"];
+        filterDescription = "Business Drives";
+      } else if (selectedFilter === "personal") {
+        purposes = ["personal"];
+        filterDescription = "Personal Drives";
+      } else {
+        purposes = undefined; // "all" - no filter
+        filterDescription = "All Drives";
+      }
+
       // Prepare the request
       const request = {
         period_start: format(periodStart, "yyyy-MM-dd"),
         period_end: format(periodEnd, "yyyy-MM-dd"),
         format: "both" as const,
         email: recipient.email,
+        purposes,
+        filter_description: filterDescription,
       };
 
       // Call the export service
       const response = await ExportService.exportTrips(request);
 
-      // Show success message
+      // Show success message with filter info
+      const filterText = selectedFilter === "all"
+        ? "all drives"
+        : selectedFilter === "work"
+          ? "business drives only"
+          : "personal drives only";
+
       Alert.alert(
         "Report Sent!",
-        `Your ${format(periodStart, "MMMM yyyy")} report has been sent to ${recipient.email}. Check your inbox!`,
+        `Your ${format(periodStart, "MMMM yyyy")} report (${filterText}) has been sent to ${recipient.email}. Check your inbox!`,
         [{ text: "OK", onPress: closeDrawer }]
       );
     } catch (error) {

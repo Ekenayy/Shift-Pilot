@@ -10,14 +10,16 @@ interface SummaryData {
 export function generateCSV(
   trips: Trip[],
   periodStart: string,
-  periodEnd: string
+  periodEnd: string,
+  filterDescription?: string
 ): string {
   const summary = calculateSummary(trips);
 
   let csv = "";
 
   // Header with report info
-  csv += `Shift-Pilot Mileage Report\n`;
+  const filterText = filterDescription ? ` - ${filterDescription}` : "";
+  csv += `Shift-Pilot Mileage Report${filterText}\n`;
   csv += `Report date range,${periodStart} - ${periodEnd}\n`;
   csv += `\n`;
 

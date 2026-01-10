@@ -7,6 +7,8 @@ interface ExportRequest {
   period_end: string; // YYYY-MM-DD
   format: ExportFormat;
   email: string;
+  purposes?: string[]; // Optional: filter by trip purposes (e.g., ['work'], ['personal'], or undefined for all)
+  filter_description?: string; // Optional: human-readable filter description (e.g., "Business Drives", "All Drives")
 }
 
 interface ExportResponse {
