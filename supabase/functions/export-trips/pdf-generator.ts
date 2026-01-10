@@ -46,14 +46,17 @@ export function generatePDF(
   doc.setFillColor(240, 240, 240);
   doc.rect(currentX, yPos, boxWidth, boxHeight, 'F');
   doc.setFontSize(8);
+  doc.setTextColor(0, 0, 0);
   doc.text("Total value", currentX + 2, yPos + 5);
   doc.setFontSize(14);
   doc.text(`$${summary.totalDeductions.toFixed(2)}`, currentX + 2, yPos + 15);
   currentX += boxWidth + 5;
 
   // Business value box
+  doc.setFillColor(240, 240, 240);
   doc.rect(currentX, yPos, boxWidth, boxHeight, 'F');
   doc.setFontSize(8);
+  doc.setTextColor(0, 0, 0);
   doc.text("Business value", currentX + 2, yPos + 5);
   doc.setFontSize(14);
   const businessDeduction = summary.milesByPurpose['work']?.deduction || 0;
@@ -61,16 +64,20 @@ export function generatePDF(
   currentX += boxWidth + 5;
 
   // Total distance box
+  doc.setFillColor(240, 240, 240);
   doc.rect(currentX, yPos, boxWidth, boxHeight, 'F');
   doc.setFontSize(8);
+  doc.setTextColor(0, 0, 0);
   doc.text("Total distance", currentX + 2, yPos + 5);
   doc.setFontSize(14);
   doc.text(`${summary.totalMiles.toFixed(1)} mi`, currentX + 2, yPos + 15);
   currentX += boxWidth + 5;
 
   // Total drives box
+  doc.setFillColor(240, 240, 240);
   doc.rect(currentX, yPos, boxWidth, boxHeight, 'F');
   doc.setFontSize(8);
+  doc.setTextColor(0, 0, 0);
   doc.text("Total drives", currentX + 2, yPos + 5);
   doc.setFontSize(14);
   doc.text(`${summary.totalDrives}`, currentX + 2, yPos + 15);
@@ -86,6 +93,7 @@ export function generatePDF(
   doc.setFontSize(8);
   doc.setFillColor(245, 237, 220);
   doc.rect(20, yPos - 5, 170, 8, 'F');
+  doc.setTextColor(0, 0, 0);
 
   doc.text("Summary", 22, yPos);
   doc.text("Distance in Miles", 50, yPos);
@@ -93,7 +101,9 @@ export function generatePDF(
   yPos += 8;
 
   // Sub headers
+  doc.setFillColor(245, 237, 220);
   doc.rect(20, yPos - 5, 170, 8, 'F');
+  doc.setTextColor(0, 0, 0);
   doc.text("Vehicle", 22, yPos);
   doc.text("Business", 50, yPos);
   doc.text("Personal", 80, yPos);
@@ -133,6 +143,7 @@ export function generatePDF(
   doc.setFontSize(7);
   doc.setFillColor(245, 237, 220);
   doc.rect(10, yPos - 4, 190, 6, 'F');
+  doc.setTextColor(0, 0, 0);
 
   doc.text("When", 12, yPos);
   doc.text("Why", 35, yPos);
@@ -145,6 +156,7 @@ export function generatePDF(
 
   // Drive log entries
   doc.setFont(undefined, 'normal');
+  doc.setTextColor(0, 0, 0);
   trips.forEach(trip => {
     if (yPos > 270) {
       doc.addPage();
@@ -154,6 +166,7 @@ export function generatePDF(
       doc.setFontSize(7);
       doc.setFillColor(245, 237, 220);
       doc.rect(10, yPos - 4, 190, 6, 'F');
+      doc.setTextColor(0, 0, 0);
       doc.text("When", 12, yPos);
       doc.text("Why", 35, yPos);
       doc.text("Start", 55, yPos);
