@@ -4,7 +4,8 @@
 
 Mileage tracking app for gig drivers (Uber, Lyft, DoorDash, Instacart). MVP focuses on reliable tracking + money framing. Future: earnings coaching.
 
-See `docs/product-context.md` and `docs/assumptions.md` for full context.
+See `docs/product-context.md` if you need context about the overall goals of the product.
+See `docs/done-so-far` for an overview about what has been built already. Prefer reading this doc or using the gemini MCP server over analyzing the full codebase yourself to conserve context tokens. 
 
 ---
 
@@ -48,22 +49,6 @@ See `docs/product-context.md` and `docs/assumptions.md` for full context.
 - Deduction snapshots are stored per-trip for audit stability
 - Client calculates, server persists
 
-### Recap Structure Over Content
-- Build flexible recap templates, not hard-coded summaries
-- Content will be A/B tested — keep it data-driven
-- Daily/weekly/monthly should share underlying structure
-
----
-
-## Testing Priorities
-
-Based on core assumptions that must validate:
-
-1. **Trip auto-detection reliability** — test on real devices early
-2. **Background location behavior** — iOS/Android differences matter
-3. **Permission grant rates** — track onboarding drop-off
-4. **Manual override frequency** — signals classification quality
-
 ---
 
 ## UI/UX Best Practices 
@@ -100,15 +85,6 @@ Based on core assumptions that must validate:
 
 ---
 
-## What NOT to Build Yet
-
-- Complex coaching/insights logic
-- Multi-platform sync beyond Supabase
-- Social features
-- Detailed analytics dashboards
-
-MVP = mileage tracking + money framing + data exports. Everything else is future scope.
-
 ## Rules on adding Packages
 - Before adding a package make sure it is not deprecated and has had some new releases in the past 2 years. If it hasn't seen a new release in 2 years, ask me first before adding it
 - Make sure to install the most recent stable version of any package you're adding unless we're specifically fixing dependency tree issues. 
@@ -117,7 +93,95 @@ MVP = mileage tracking + money framing + data exports. Everything else is future
 - If the user didn't explicitly ask you to "provide code" for something, always provide a consultation before coding. 
 - Even if the user says "help me build this feature", your first output should be a plan of action that you will then revise with the user
 - If the user asks general questions like "how can I get a user token", provide options instead of starting to code immediately
-- NEVER provide code for multiple options that the user hasn't approved yet
 
 ## Documentation Rules
 - After completing a new feature, be sure to add it in done-so-far.md in `docs/done-so-far`
+
+## MCP Tool Usage Guidelines
+
+### Gemini MCP Server (Large Context + Verification)
+
+Use the Gemini MCP server when tasks require analyzing **large codebases, multiple files, or entire directories** that may exceed Claude’s effective context window.
+
+Prefer Gemini MCP for:
+- Whole-repo or multi-directory analysis
+- Architecture or dependency synthesis
+- Project-wide pattern detection
+- Verification tasks (confirming whether a feature, pattern, or security measure exists)
+- Situations where total file size likely exceeds ~100KB
+- Cross-checking or validating conclusions drawn from partial context
+- Multimodal analysis (images, diagrams, screenshots)
+
+#### Explicit Task Triggers
+Use Gemini MCP if the user asks to:
+- “Summarize this entire project / repo”
+- “Analyze the architecture / structure of this codebase”
+- “Check whether X is implemented across the codebase”
+- “Find all instances of a pattern / hook / middleware / security measure”
+- “Verify auth / rate limiting / caching / error handling”
+- “Sanity check this reasoning using the full codebase”
+- “Analyze these directories together”
+
+#### Scope Guidance
+When using Gemini MCP for analysis or verification:
+- Prefer directory-level inclusion over individual files
+- Include all relevant sibling directories when checking for presence or absence of features
+- Use project-root inclusion for architecture or dependency analysis
+
+#### Verification-Focused Queries
+When verifying implementations, be specific:
+- Ask Gemini to **list files and functions**
+- Request **concrete examples**, not summaries
+- Prefer “Is X implemented? Show where and how.”
+
+#### Do NOT use Gemini MCP for:
+- Simple code edits or refactors
+- Small, localized file changes
+- Tight iteration loops
+- Mechanical transformations Claude can handle directly
+
+Default to native Claude tools unless one of the above conditions is met. If you hit quota limits on Gemini, use Codex for these same tasks. 
+
+### Codex MCP Server (Code Review, Debugging, Security)
+
+Use the Codex MCP server for **code-centric reasoning and corrective work** where precision, best practices, or security awareness matters.
+
+Prefer Codex MCP for:
+- Code reviews (correctness, readability, maintainability)
+- Technical guidance and implementation advice
+- Debugging and bug root-cause analysis
+- Fixing failing tests or runtime errors
+- Identifying security vulnerabilities or unsafe patterns
+- Reviewing diffs, PR-style changes, or refactors
+- Evaluating tradeoffs between implementation approaches
+
+#### Explicit Task Triggers
+Use Codex MCP if the user asks to:
+- “Review this code” or “do a code review”
+- “Find bugs” or “why is this broken?”
+- “Fix this error / test failure”
+- “Is this implementation correct?”
+- “How should I implement X?”
+- “Are there security issues here?”
+- “Check this for vulnerabilities / unsafe patterns”
+- “Suggest improvements or best practices”
+
+#### Scope Guidance
+- Prefer **focused, relevant files** over whole-repo inclusion
+- Include related files when debugging cross-file behavior
+- When reviewing changes, focus on diffs or modified areas first
+
+#### Security & Correctness Focus
+When using Codex MCP:
+- Prioritize correctness over style
+- Call out undefined behavior, edge cases, and failure modes
+- Explicitly note security risks (auth, input validation, secrets, permissions)
+- Provide concrete fixes or safer alternatives when possible
+
+#### Do NOT use Codex MCP for:
+- Whole-repo or architecture-level synthesis
+- Large-scale pattern detection across directories
+- High-level exploratory analysis better suited for Gemini
+- Simple mechanical edits Claude can do directly
+
+Default to native Claude tools unless the task clearly benefits from Codex’s code-focused reasoning. If you hit quota limits on Gemini, use Gemini for these same tasks. 
