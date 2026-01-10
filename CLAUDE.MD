@@ -107,11 +107,17 @@ Based on core assumptions that must validate:
 - Social features
 - Detailed analytics dashboards
 
-MVP = tracking + money framing + recaps. Everything else is future scope.
+MVP = mileage tracking + money framing + data exports. Everything else is future scope.
 
 ## Rules on adding Packages
 - Before adding a package make sure it is not deprecated and has had some new releases in the past 2 years. If it hasn't seen a new release in 2 years, ask me first before adding it
 - Make sure to install the most recent stable version of any package you're adding unless we're specifically fixing dependency tree issues. 
+
+## Workflow Rules
+- If the user didn't explicitly ask you to "provide code" for something, always provide a consultation before coding. 
+- Even if the user says "help me build this feature", your first output should be a plan of action that you will then revise with the user
+- If the user asks general questions like "how can I get a user token", provide options instead of starting to code immediately
+- NEVER provide code for multiple options that the user hasn't approved yet
 
 ## Documentation Rules
 - After completing a new feature, be sure to add it in done-so-far.md in `docs/done-so-far`

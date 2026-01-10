@@ -318,6 +318,67 @@ These screens exist but have minimal implementation:
 
 ---
 
+## 12. Trip Export & Email Delivery
+
+### Features Implemented
+- Server-side export generation via Supabase Edge Function
+- CSV export (IRS-compliant format, similar to MileIQ)
+- PDF export with summary and detailed drive log
+- Email delivery via Resend
+- Export history tracking in `exports` table
+
+### How It Works
+- **Edge Function** (`export-trips`): Serverless function that handles export generation and email delivery
+- Queries trips for specified date range with automatic RLS filtering
+- Generates CSV and/or PDF on-demand (no file storage)
+- Sends branded HTML email with attachments via Resend
+- Records export metadata in database for tracking
+
+### Export Formats
+
+#### CSV Export
+- Deduction rates summary at top
+- Summary section by trip purpose (Business, Personal, Medical, Charity, etc.)
+- Detailed trip log with: date/time, start/end addresses, purpose, distance, rate, deduction value, notes
+- Totals row for verification
+- IRS-compliant format
+
+#### PDF Export
+- Professional report header with date range and business rate
+- Summary cards: total value, business value, total distance, total drives
+- Vehicle summary table with miles breakdown by purpose
+- Multi-page detailed drive log with headers on each page
+- Page totals and report totals
+- Branded footer
+
+### Email Template
+- Branded HTML email with Shift-Pilot styling
+- Report summary (total trips, miles, deductions)
+- Attached CSV and/or PDF files
+- Call-to-action link to website
+- Professional formatting
+
+### Supabase Integration
+- Edge Function uses RLS to ensure users only export their own data
+- Records each export in `exports` table with: user_id, export_type, period_start, period_end, rows_included
+- Uses Supabase Auth for user validation
+- Automatic token handling via Authorization header
+
+### Key Files
+- `supabase/functions/export-trips/index.ts` - Main Edge Function handler
+- `supabase/functions/export-trips/csv-generator.ts` - CSV generation logic
+- `supabase/functions/export-trips/pdf-generator.ts` - PDF generation with jsPDF
+- `supabase/functions/_shared/database.types.ts` - Shared database types
+- `supabase/functions/_shared/supabase.ts` - Supabase client helper
+- `supabase/functions/_shared/cors.ts` - CORS headers
+
+### Dependencies
+- `jspdf@2.5.2` - PDF generation for Edge Functions
+- `@supabase/supabase-js@2` - Supabase client
+- Resend API - Email delivery service
+
+---
+
 ## Key Dependencies
 
 | Package | Purpose |
@@ -344,9 +405,9 @@ Per `CLAUDE.MD`, these are explicitly out of scope for MVP:
 - Social features
 - Detailed analytics dashboards
 - Daily/weekly/monthly recap notifications
-- Export functionality (CSV/PDF)
 - Subscription/payment integration
 - Vehicle management
+- Mobile UI for triggering trip exports (backend complete, needs mobile integration)
 
 ---
 
@@ -361,6 +422,9 @@ Per `CLAUDE.MD`, these are explicitly out of scope for MVP:
 ### Server-Side Responsibilities
 - Data persistence with RLS
 - Deduction rates storage
+- Trip export generation (CSV/PDF)
+- Email delivery via Resend
+- Export history tracking
 - Plan enforcement (future)
 - Recap rollups/caching (future)
 

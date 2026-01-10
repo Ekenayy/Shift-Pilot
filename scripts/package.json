@@ -1,0 +1,12 @@
+{
+  "name": "shift-pilot-scripts",
+  "version": "1.0.0",
+  "description": "Utility scripts for Shift-Pilot development",
+  "private": true,
+  "scripts": {
+    "get-token": "node get-token.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0"
+  }
+}
